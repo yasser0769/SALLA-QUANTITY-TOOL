@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تحديث كميات سلة</title>
+<link href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg: #06080f;
+  --surface: #0d1117;
+  --surface2: #151b28;
+  --surface3: #1c2435;
+  --border: #21293a;
+  --border2: #2d3852;
+  --text: #e4e8f1;
+  --text2: #7b88a0;
+  --text3: #4e5a72;
+  --accent: #3b82f6;
+  --accent-dim: rgba(59,130,246,0.1);
+  --green: #22c55e;
+  --green-dim: rgba(34,197,94,0.1);
+  --red: #ef4444;
+  --red-dim: rgba(239,68,68,0.1);
+  --amber: #f59e0b;
+  --amber-dim: rgba(245,158,11,0.1);
+  --radius: 12px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Readex Pro',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.6}
+
+.grain{position:fixed;inset:0;pointer-events:none;opacity:0.025;z-index:9999;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.glow-top{position:fixed;top:-200px;left:50%;transform:translateX(-50%);width:800px;height:500px;
+  background:radial-gradient(ellipse,rgba(59,130,246,0.06),transparent 70%);pointer-events:none;z-index:0}
+
+.app{max-width:1080px;margin:0 auto;padding:48px 20px 80px;position:relative;z-index:1}
+
+.hdr{text-align:center;margin-bottom:56px}
+.hdr .badge{display:inline-block;padding:4px 14px;border-radius:20px;font-size:0.7rem;font-weight:500;
+  background:var(--accent-dim);color:var(--accent);margin-bottom:16px;letter-spacing:0.5px}
+.hdr h1{font-size:1.8rem;font-weight:700;letter-spacing:-0.5px;margin-bottom:8px}
+.hdr p{color:var(--text2);font-size:0.88rem;font-weight:300}
+
+.uploads{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+@media(max-width:680px){.uploads{grid-template-columns:1fr}}
+
+.upload-zone{background:var(--surface);border:1.5px dashed var(--border);border-radius:var(--radius);
+  padding:28px 20px;text-align:center;cursor:pointer;transition:all 0.25s;position:relative}
+.upload-zone:hover{border-color:var(--border2);background:var(--surface2)}
+.upload-zone.ok{border-style:solid;border-color:var(--green)}
+.upload-zone input{display:none}
+.upload-zone .ico{font-size:28px;margin-bottom:10px}
+.upload-zone h3{font-size:0.92rem;font-weight:600;margin-bottom:4px}
+.upload-zone .sub{font-size:0.75rem;color:var(--text2);font-weight:300}
+.upload-zone .finfo{font-size:0.78rem;color:var(--green);margin-top:10px;font-weight:500}
+
+.settings{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:20px;margin-bottom:24px}
+.settings summary{font-size:0.85rem;font-weight:500;color:var(--text2);cursor:pointer;list-style:none}
+.settings summary::-webkit-details-marker{display:none}
+.settings summary::before{content:'⚙️ ';font-size:0.9rem}
+.settings[open] summary{margin-bottom:16px}
+.settings-body{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.field label{display:block;font-size:0.72rem;color:var(--text3);margin-bottom:4px;font-weight:400}
+.field select,.field input[type="number"]{width:100%;padding:9px 12px;background:var(--surface2);
+  border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.8rem;outline:none}
+.field select:focus,.field input:focus{border-color:var(--accent)}
+
+.go-btn{width:100%;padding:14px;border:none;border-radius:var(--radius);font-family:inherit;
+  font-size:0.95rem;font-weight:600;cursor:pointer;transition:all 0.2s;
+  background:var(--accent);color:#fff;margin-bottom:28px}
+.go-btn:hover:not(:disabled){opacity:0.88;transform:translateY(-1px)}
+.go-btn:disabled{opacity:0.3;cursor:not-allowed}
+
+.prog{height:3px;background:var(--surface2);border-radius:4px;margin-bottom:24px;overflow:hidden;display:none}
+.prog .bar{height:100%;background:var(--accent);border-radius:4px;transition:width 0.3s;width:0}
+
+.stats{display:none;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:28px}
+@media(max-width:600px){.stats{grid-template-columns:repeat(2,1fr)}}
+.st{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;text-align:center}
+.st .n{font-size:1.5rem;font-weight:700;margin-bottom:2px}
+.st .l{font-size:0.7rem;color:var(--text2);font-weight:300}
+.st.t1 .n{color:var(--accent)} .st.t2 .n{color:var(--amber)} .st.t3 .n{color:var(--green)} .st.t4 .n{color:var(--red)}
+
+.results{display:none}
+.res-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px}
+.res-hdr h2{font-size:1.05rem;font-weight:600}
+.res-actions{display:flex;gap:8px}
+.btn-s{padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--surface);
+  color:var(--text);font-family:inherit;font-size:0.78rem;font-weight:500;cursor:pointer;transition:all 0.2s}
+.btn-s:hover{border-color:var(--accent);background:var(--surface2)}
+.btn-s.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-s.pri:hover{opacity:0.88}
+
+.tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.tab{padding:6px 14px;border-radius:7px;font-size:0.76rem;font-weight:500;cursor:pointer;
+  border:1px solid var(--border);background:transparent;color:var(--text2);font-family:inherit;transition:all 0.2s}
+.tab:hover{border-color:var(--accent);color:var(--text)}
+.tab.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+.search{width:100%;padding:10px 14px;background:var(--surface);border:1px solid var(--border);
+  border-radius:10px;color:var(--text);font-family:inherit;font-size:0.82rem;outline:none;margin-bottom:14px}
+.search:focus{border-color:var(--accent)}
+
+.tbl-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  overflow:hidden;max-height:65vh;overflow-y:auto}
+.tbl-wrap::-webkit-scrollbar{width:5px}
+.tbl-wrap::-webkit-scrollbar-track{background:var(--surface)}
+.tbl-wrap::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+table{width:100%;border-collapse:collapse;font-size:0.78rem}
+thead{position:sticky;top:0;z-index:2}
+th{background:var(--surface2);padding:12px 10px;font-weight:600;text-align:right;color:var(--text2);
+  font-size:0.72rem;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:10px;border-bottom:1px solid rgba(33,41,58,0.5);white-space:nowrap}
+tr:hover td{background:rgba(59,130,246,0.02)}
+tr.option-row td{color:var(--text2);font-size:0.74rem}
+tr.option-row td:first-child{padding-right:24px}
+.old{color:var(--text3)}
+.new-up{color:var(--green);font-weight:600}
+.new-down{color:var(--red);font-weight:600}
+.badge-s{display:inline-block;padding:2px 8px;border-radius:5px;font-size:0.68rem;font-weight:600}
+.badge-s.up{background:var(--green-dim);color:var(--green)}
+.badge-s.down{background:var(--red-dim);color:var(--red)}
+.type-badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:0.68rem;font-weight:500}
+.type-badge.product{background:var(--accent-dim);color:var(--accent)}
+.type-badge.option{background:var(--amber-dim);color:var(--amber)}
+.empty{text-align:center;padding:48px;color:var(--text3);font-size:0.85rem}
+
+.note-box{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px 20px;margin-bottom:24px;font-size:0.8rem;color:var(--text2);line-height:1.8}
+.note-box strong{color:var(--text);font-weight:500}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.anim{animation:fadeUp 0.35s ease forwards}
+</style>
+</head>
+<body>
+
+<div class="grain"></div>
+<div class="glow-top"></div>
+
+<div class="app">
+  <div class="hdr anim">
+    <div class="badge">SALLA QUANTITY TOOL v2</div>
+    <h1>تحديث كميات المتجر</h1>
+    <p>ارفع ملف المتجر + ملف المورد ← احصل على كشف التغييرات جاهز للرفع</p>
+  </div>
+
+  <div class="note-box anim">
+    <strong>آلية العمل:</strong> المنتجات الموجودة عند المورد ← الكمية <span style="color:var(--green)">500</span> | غير الموجودة ← الكمية <span style="color:var(--red)">0</span><br>
+    <strong>المنتجات ذات الخيارات:</strong> يتم تحديث كل خيار حسب وجوده عند المورد، ويتم تحديث كمية المنتج الأب تلقائياً (مجموع كميات الخيارات)<br>
+    <strong>الملف النهائي:</strong> بنفس هيكلة ملف المتجر — جاهز للرفع مباشرة على سلة
+  </div>
+
+  <div class="uploads">
+    <div class="upload-zone" onclick="this.querySelector('input').click()" id="zStore">
+      <input type="file" accept=".xlsx,.xls,.csv" onchange="loadStore(event)">
+      <div class="ico">🏪</div>
+      <h3>ملف المتجر (سلة)</h3>
+      <div class="sub">product-quantities.xlsx</div>
+      <div class="finfo" id="infoStore"></div>
+    </div>
+    <div class="upload-zone" onclick="this.querySelector('input').click()" id="zSupplier">
+      <input type="file" accept=".xlsx,.xls,.csv" onchange="loadSupplier(event)">
+      <div class="ico">📦</div>
+      <h3>ملف المورد (FragranceX)</h3>
+      <div class="sub">AllFragrancesExcelList.xls</div>
+      <div class="finfo" id="infoSupplier"></div>
+    </div>
+  </div>
+
+  <details class="settings">
+    <summary>إعدادات متقدمة</summary>
+    <div class="settings-body">
+      <div class="field">
+        <label>الكمية للمتوفر عند المورد</label>
+        <input type="number" id="qtyAvailable" value="500">
+      </div>
+      <div class="field">
+        <label>الكمية لغير المتوفر</label>
+        <input type="number" id="qtyUnavailable" value="0">
+      </div>
+      <div class="field">
+        <label>بداية بيانات المورد (رقم الصف)</label>
+        <input type="number" id="supplierStartRow" value="7">
+      </div>
+      <div class="field">
+        <label>عمود Item# في المورد (رقم العمود)</label>
+        <input type="number" id="supplierSkuCol" value="2">
+      </div>
+    </div>
+  </details>
+
+  <button class="go-btn" id="goBtn" disabled onclick="process()">⚡ معالجة ومقارنة</button>
+
+  <div class="prog" id="prog"><div class="bar" id="progBar"></div></div>
+
+  <div class="stats" id="statsGrid">
+    <div class="st t1"><div class="n" id="s1">0</div><div class="l">إجمالي المنتجات</div></div>
+    <div class="st t2"><div class="n" id="s2">0</div><div class="l">تغييرات</div></div>
+    <div class="st t3"><div class="n" id="s3">0</div><div class="l">أصبحت متوفرة</div></div>
+    <div class="st t4"><div class="n" id="s4">0</div><div class="l">نفدت</div></div>
+  </div>
+
+  <div class="results" id="results">
+    <div class="res-hdr">
+      <h2>📋 كشف التغييرات</h2>
+      <div class="res-actions">
+        <button class="btn-s pri" onclick="downloadXlsx()">⬇️ تحميل XLSX</button>
+        <button class="btn-s" onclick="downloadCSV()">📄 CSV</button>
+      </div>
+    </div>
+
+    <div class="tabs" id="tabs">
+      <button class="tab on" onclick="setFilter('all',this)">الكل</button>
+      <button class="tab" onclick="setFilter('up',this)">⬆️ أصبح متوفر</button>
+      <button class="tab" onclick="setFilter('down',this)">⬇️ نفد</button>
+    </div>
+
+    <input type="text" class="search" placeholder="🔍 بحث بالاسم أو SKU..." oninput="doSearch(this.value)">
+
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>No.</th>
+            <th>النوع</th>
+            <th>اسم المنتج</th>
+            <th>رمز SKU</th>
+            <th>غير محدود</th>
+            <th>الكمية السابقة</th>
+            <th>الكمية الجديدة</th>
+            <th>الحالة</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="emptyMsg" style="display:none">لا توجد نتائج</div>
+  </div>
+</div>
+
+<script>
+let storeRaw = null, supplierRaw = null;
+let changeRows = [];
+let exportRows = [];
+let curFilter = 'all', curSearch = '';
+
+function readFile(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = e => {
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        resolve(XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }));
+      } catch(err) { reject(err); }
+    };
+    r.onerror = reject;
+    r.readAsArrayBuffer(file);
+  });
+}
+
+async function loadStore(ev) {
+  const f = ev.target.files[0]; if(!f) return;
+  storeRaw = await readFile(f);
+  document.getElementById('zStore').classList.add('ok');
+  document.getElementById('infoStore').textContent = `✅ ${f.name} — ${(storeRaw.length-2).toLocaleString()} صف`;
+  checkReady();
+}
+
+async function loadSupplier(ev) {
+  const f = ev.target.files[0]; if(!f) return;
+  supplierRaw = await readFile(f);
+  document.getElementById('zSupplier').classList.add('ok');
+  const startRow = parseInt(document.getElementById('supplierStartRow').value) || 7;
+  const dataCount = supplierRaw.length - startRow;
+  document.getElementById('infoSupplier').textContent = `✅ ${f.name} — ${dataCount.toLocaleString()} منتج`;
+  checkReady();
+}
+
+function checkReady() {
+  document.getElementById('goBtn').disabled = !(storeRaw && supplierRaw);
+}
+
+function process() {
+  const QTY_AVAIL = parseInt(document.getElementById('qtyAvailable').value) || 500;
+  const QTY_UNAVAIL = parseInt(document.getElementById('qtyUnavailable').value) || 0;
+  const SUP_START = parseInt(document.getElementById('supplierStartRow').value) || 7;
+  const SUP_SKU_COL = (parseInt(document.getElementById('supplierSkuCol').value) || 2) - 1;
+
+  const prog = document.getElementById('prog');
+  const bar = document.getElementById('progBar');
+  prog.style.display = 'block';
+  bar.style.width = '5%';
+
+  // 1) Build supplier SKU set
+  const supplierSKUs = new Set();
+  for (let i = SUP_START; i < supplierRaw.length; i++) {
+    const sku = String(supplierRaw[i][SUP_SKU_COL] || '').trim();
+    if (sku && sku !== 'Item#' && sku !== '') supplierSKUs.add(sku);
+  }
+  bar.style.width = '20%';
+
+  // 2) Parse store: Row 0 = banner, Row 1 = headers, Row 2+ = data
+  // Cols: [0]=No, [1]=النوع, [2]=اسم, [3]=SKU, [4]=غير محدود, [5]=الكمية
+  const products = [];
+  let currentProduct = null;
+
+  for (let i = 2; i < storeRaw.length; i++) {
+    const row = storeRaw[i];
+    const rType = String(row[1] || '').trim();
+    const no = row[0] || '';
+    const name = row[2] || '';
+    const rawSku = row[3];
+    const sku = rawSku ? String(typeof rawSku === 'number' ? Math.round(rawSku) : rawSku).trim() : '';
+    const unlimited = row[4] || '';
+    const qty = parseFloat(row[5]) || 0;
+
+    if (rType === 'منتج') {
+      currentProduct = { no, type: rType, name, sku, unlimited, qty, options: [] };
+      products.push(currentProduct);
+    } else if (rType === 'خيار' && currentProduct) {
+      currentProduct.options.push({ no, type: rType, name, sku, unlimited, qty });
+    }
+  }
+  bar.style.width = '50%';
+
+  // 3) Compare and detect changes
+  changeRows = [];
+  exportRows = [];
+  let totalProducts = products.length, totalChanges = 0, totalUp = 0, totalDown = 0;
+
+  for (const prod of products) {
+    if (prod.options.length === 0) {
+      // Simple product — no options
+      if (!prod.sku) continue;
+      const inSupplier = supplierSKUs.has(prod.sku);
+      const newQty = inSupplier ? QTY_AVAIL : QTY_UNAVAIL;
+      if (newQty === prod.qty) continue;
+
+      totalChanges++;
+      const dir = newQty > prod.qty ? 'up' : 'down';
+      if (dir === 'up') totalUp++; else totalDown++;
+      changeRows.push({ no:prod.no, type:'منتج', name:prod.name, sku:prod.sku, unlimited:prod.unlimited, oldQty:prod.qty, newQty, dir, isOption:false });
+      exportRows.push([prod.no, 'منتج', prod.name, prod.sku, prod.unlimited, newQty]);
+    } else {
+      // Product with options — check each option
+      let newParentQty = 0;
+      let anyOptionChanged = false;
+      const optResults = [];
+
+      for (const opt of prod.options) {
+        if (!opt.sku) continue;
+        const inSupplier = supplierSKUs.has(opt.sku);
+        const newOptQty = inSupplier ? QTY_AVAIL : QTY_UNAVAIL;
+        newParentQty += newOptQty;
+        if (newOptQty !== opt.qty) anyOptionChanged = true;
+        optResults.push({ ...opt, newQty: newOptQty });
+      }
+
+      const parentChanged = newParentQty !== prod.qty;
+      if (!parentChanged && !anyOptionChanged) continue;
+
+      totalChanges++;
+      const parentDir = newParentQty > prod.qty ? 'up' : (newParentQty < prod.qty ? 'down' : 'same');
+      if (parentDir === 'up') totalUp++;
+      else if (parentDir === 'down') totalDown++;
+
+      // Add parent row
+      changeRows.push({ no:prod.no, type:'منتج', name:prod.name, sku:prod.sku||'', unlimited:prod.unlimited, oldQty:prod.qty, newQty:newParentQty, dir:parentDir, isOption:false });
+      exportRows.push([prod.no, 'منتج', prod.name, prod.sku||'', prod.unlimited, newParentQty]);
+
+      // Add ALL options for this product (so Salla file is complete)
+      for (const opt of optResults) {
+        const optDir = opt.newQty > opt.qty ? 'up' : (opt.newQty < opt.qty ? 'down' : 'same');
+        changeRows.push({ no:opt.no, type:'خيار', name:opt.name, sku:opt.sku, unlimited:opt.unlimited||'', oldQty:opt.qty, newQty:opt.newQty, dir:optDir, isOption:true });
+        exportRows.push([opt.no, 'خيار', opt.name, opt.sku, opt.unlimited||'', opt.newQty]);
+      }
+    }
+  }
+  bar.style.width = '90%';
+
+  // 4) Update UI
+  document.getElementById('s1').textContent = totalProducts.toLocaleString();
+  document.getElementById('s2').textContent = totalChanges.toLocaleString();
+  document.getElementById('s3').textContent = totalUp.toLocaleString();
+  document.getElementById('s4').textContent = totalDown.toLocaleString();
+  document.getElementById('statsGrid').style.display = 'grid';
+  document.getElementById('results').style.display = 'block';
+
+  bar.style.width = '100%';
+  setTimeout(() => { prog.style.display = 'none'; }, 400);
+  renderTable(changeRows);
+}
+
+function getFiltered() {
+  let data = changeRows;
+  if (curFilter === 'up') data = data.filter(r => r.dir === 'up');
+  if (curFilter === 'down') data = data.filter(r => r.dir === 'down');
+  if (curSearch) {
+    const q = curSearch.toLowerCase();
+    data = data.filter(r => r.name.toLowerCase().includes(q) || String(r.sku).includes(q));
+  }
+  return data;
+}
+
+function renderTable(data) {
+  const tbody = document.getElementById('tbody');
+  const empty = document.getElementById('emptyMsg');
+  if (!data.length) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+
+  const CHUNK = 400;
+  tbody.innerHTML = '';
+  let idx = 0;
+
+  function chunk(start) {
+    const end = Math.min(start + CHUNK, data.length);
+    let h = '';
+    for (let i = start; i < end; i++) {
+      const r = data[i];
+      const trClass = r.isOption ? ' class="option-row"' : '';
+      const prefix = r.isOption ? '↳ ' : '';
+      const typeClass = r.type === 'منتج' ? 'product' : 'option';
+      const dirClass = r.dir === 'up' ? 'up' : (r.dir === 'down' ? 'down' : '');
+      const dirLabel = r.dir === 'up' ? '⬆️ متوفر' : (r.dir === 'down' ? '⬇️ نفد' : '—');
+      const newClass = r.dir === 'up' ? 'new-up' : (r.dir === 'down' ? 'new-down' : '');
+
+      h += `<tr${trClass}>
+        <td>${++idx}</td>
+        <td>${r.no}</td>
+        <td><span class="type-badge ${typeClass}">${r.type}</span></td>
+        <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis" title="${r.name}">${prefix}${r.name}</td>
+        <td>${r.sku}</td>
+        <td>${r.unlimited || ''}</td>
+        <td class="old">${r.oldQty}</td>
+        <td class="${newClass}">${r.newQty}</td>
+        <td>${dirClass ? `<span class="badge-s ${dirClass}">${dirLabel}</span>` : '—'}</td>
+      </tr>`;
+    }
+    tbody.insertAdjacentHTML('beforeend', h);
+    if (end < data.length) requestAnimationFrame(() => chunk(end));
+  }
+  chunk(0);
+}
+
+function setFilter(f, btn) {
+  curFilter = f;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
+  btn.classList.add('on');
+  renderTable(getFiltered());
+}
+
+function doSearch(v) {
+  curSearch = v;
+  renderTable(getFiltered());
+}
+
+function downloadXlsx() {
+  const header1 = ['بيانات المنتج', '', '', '', '', 'الكميات'];
+  const header2 = ['No.', 'النوع', 'أسم المنتج', 'رمز المنتج sku', 'غير محدود الكمية', 'الكمية'];
+  const wsData = [header1, header2, ...exportRows];
+
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = [{ wch:14 },{ wch:8 },{ wch:60 },{ wch:12 },{ wch:16 },{ wch:10 }];
+  ws['!merges'] = [{ s:{r:0,c:0}, e:{r:0,c:4} }];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Salla Product Quantities Sheet');
+  XLSX.writeFile(wb, `salla_quantity_update_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+function downloadCSV() {
+  let csv = '\uFEFF' + 'No.,النوع,أسم المنتج,رمز المنتج sku,غير محدود الكمية,الكمية\n';
+  exportRows.forEach(r => {
+    csv += `${r[0]},${r[1]},"${String(r[2]).replace(/"/g,'""')}",${r[3]},${r[4]},${r[5]}\n`;
+  });
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `salla_quantity_update_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+</script>
+
+</body>
+</html>
