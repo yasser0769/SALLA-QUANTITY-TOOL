@@ -24,6 +24,9 @@ has(/function\s+arabicType/, 'page must derive Arabic perfume/type labels from S
 has(/stCsv/, 'stats must include CSV SKU count');
 has(/stXls/, 'stats must include XLS SKU count');
 has(/stExcluded/, 'stats must include XLS-only excluded SKU count');
+has(/const\s+TEMPLATE_BASE64='[^']{1000,}'/, 'page must embed a template fallback for file:// usage');
+has(/function\s+base64ToArrayBuffer/, 'page must decode embedded template fallback');
+has(/catch\s*\([^)]*\)\s*\{[\s\S]*TEMPLATE_BASE64/, 'workbookFromTemplate must fallback when fetch fails');
 
 const pricePackBody = html.match(/function\s+pricePack\s*\([^)]*\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
 assert.ok(pricePackBody.includes("['Cost']") || pricePackBody.includes('.Cost'), 'pricePack must use XLS Cost');
@@ -36,4 +39,18 @@ has(/optName:\s*isVariant\s*\?\s*'الحجم'/, 'variant parent rows must define
 has(/optType:\s*isVariant\s*\?\s*'صورة'/, 'variant parent rows must define [1] النوع as صورة');
 has(/largeImageUrl\([^)]*Image Src/, 'option/product images must pass through largeImageUrl');
 has(/\/images\\\/products\\\/sku\\\/small\\\/.*i/, 'largeImageUrl must catch lowercase sku/small FragranceX paths');
+has(/function\s+cleanImageAltText/, 'image alt text must be sanitized for Salla');
+has(/[\u0600-\u06FF]/, 'test file sanity check for Arabic regex support');
+has(/replace\(\s*\/\[\^\\p\{Script=Arabic\}\\p\{Script=Latin\}\\s\]\+\/gu\s*,\s*''\s*\)/, 'image alt sanitizer must keep only Arabic/English letters and spaces');
+has(/noimage5\.png/, 'noimage5 placeholder images must be detected');
+has(/function\s+isNoImageUrl/, 'page must expose no-image detection helper');
+has(/function\s+filterRowsWithImages/, 'rows with noimage5 must be excluded before preview/export');
+has(/id="previewSearch"/, 'preview must include a search box');
+has(/id="previewTypeFilter"/, 'preview must include a row-type filter');
+has(/id="previewCategoryFilter"/, 'preview must include a category filter');
+has(/id="previewBrandFilter"/, 'preview must include a brand filter');
+has(/function\s+resetPreviewFilters/, 'preview filters must have a reset action');
+has(/function\s+filteredPreviewRows/, 'preview must filter rowCache without changing export selection');
+has(/function\s+previewRowKind/, 'preview must classify parent/simple/option rows');
+has(/label='او دو برفيوم'/, 'plain Parfum results must become او دو برفيوم');
 notHas(/templateFileObj/, 'template upload state must stay removed');
