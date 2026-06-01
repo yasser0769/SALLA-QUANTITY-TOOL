@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>منتجات المورد الجديدة</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<style>
+:root{
+  --bg:#0b0c10;--surface:#12141a;--surface2:#181b23;--surface3:#222734;
+  --border:#2a2f3a;--border2:#3b4250;--text:#f3f4f6;--text2:#a2a8b3;--text3:#707887;
+  --accent:#14b8a6;--accent-dim:rgba(20,184,166,.12);--green:#22c55e;--red:#fb7185;--amber:#f59e0b;
+  --green-dim:rgba(34,197,94,.13);--red-dim:rgba(251,113,133,.13);--amber-dim:rgba(245,158,11,.13);
+  --shadow:0 18px 45px rgba(0,0,0,.24);--radius:10px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{background:var(--bg)}
+body{font-family:'IBM Plex Sans Arabic',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:linear-gradient(180deg,#101114 0,#0b0c10 260px);color:var(--text);min-height:100vh;line-height:1.65}
+.grain{position:fixed;inset:0;pointer-events:none;opacity:.018;z-index:9999;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.app{max-width:1200px;margin:0 auto;padding:38px 20px 80px;position:relative;z-index:1}
+.hdr{text-align:center;margin-bottom:30px;border-bottom:1px solid var(--border);padding-bottom:26px}
+.badge{display:inline-flex;align-items:center;padding:5px 12px;border:1px solid rgba(20,184,166,.24);border-radius:999px;font-size:.68rem;font-weight:700;background:var(--accent-dim);color:#67e8f9;margin-bottom:13px}
+h1{font-size:clamp(1.55rem,3vw,2.1rem);font-weight:700;margin-bottom:8px}
+.hdr p{color:var(--text2);font-size:.92rem;font-weight:400;max-width:780px;margin:0 auto}
+.top-link{display:inline-block;margin-top:12px;color:var(--accent);font-size:.82rem;font-weight:700;text-decoration:none}
+.note,.panel{background:linear-gradient(180deg,rgba(24,27,35,.98),rgba(18,20,26,.98));border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 12px 28px rgba(0,0,0,.14)}
+.note{border-inline-start:3px solid var(--accent);padding:17px 20px;margin-bottom:20px;font-size:.82rem;color:var(--text2);line-height:1.95}
+.note strong{color:var(--text)}
+.uploads{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
+@media(max-width:860px){.uploads{grid-template-columns:1fr}}
+.upload-zone{background:linear-gradient(180deg,var(--surface2),var(--surface));border:1px dashed var(--border2);border-radius:var(--radius);padding:24px 18px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s,transform .2s,box-shadow .2s;min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.upload-zone:hover{border-color:var(--accent);background:#1a1e27;transform:translateY(-2px);box-shadow:var(--shadow)}
+.upload-zone.ok{border-style:solid;border-color:rgba(34,197,94,.65);background:linear-gradient(180deg,rgba(34,197,94,.08),var(--surface))}
+.upload-zone input{display:none}
+.upload-zone .ico{font-size:30px;margin-bottom:8px}
+.upload-zone h3{font-size:.95rem;font-weight:700;margin-bottom:3px}
+.upload-zone .sub{font-size:.74rem;color:var(--text2)}
+.file-info{font-size:.76rem;color:var(--green);margin-top:10px;font-weight:600;word-break:break-word}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}
+.btn{padding:11px 17px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit;font-size:.86rem;font-weight:700;cursor:pointer;transition:all .2s}
+.btn:hover:not(:disabled){border-color:var(--accent);background:var(--surface2);transform:translateY(-1px)}
+.btn.primary{background:linear-gradient(135deg,#14b8a6,#0f766e);border-color:transparent;color:#fff;box-shadow:0 14px 30px rgba(20,184,166,.18)}
+.btn:disabled{opacity:.38;cursor:not-allowed;box-shadow:none}
+.progress{height:4px;background:var(--surface2);border-radius:4px;margin-bottom:20px;overflow:hidden;display:none}
+.progress .bar{height:100%;background:linear-gradient(90deg,var(--accent),#a78bfa,var(--amber));width:0;transition:width .3s}
+.log{background:#0f1117;border:1px solid var(--border);border-radius:var(--radius);padding:13px 16px;margin-bottom:20px;font-size:.75rem;color:var(--text2);max-height:126px;overflow-y:auto;display:none;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.stats{display:none;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;margin-bottom:20px}
+@media(max-width:760px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{background:linear-gradient(180deg,var(--surface2),var(--surface));border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center}
+.stat .n{font-size:1.42rem;font-weight:700;margin-bottom:1px}
+.stat .l{font-size:.7rem;color:var(--text2)}
+.panel{display:none;padding:16px;margin-bottom:20px}
+.panel.on{display:block}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.panel h2{font-size:1.05rem}
+.search{width:min(360px,100%);padding:10px 12px;background:#0f1117;border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;outline:none}
+.brand-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;max-height:300px;overflow:auto;padding-inline-end:4px}
+.brand-item{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#0f1117;border:1px solid var(--border);border-radius:8px;padding:9px 10px;font-size:.8rem}
+.brand-item label{display:flex;align-items:center;gap:8px;cursor:pointer;min-width:0}
+.brand-item input{accent-color:var(--accent)}
+.brand-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.count{color:var(--text3);font-size:.72rem}
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:auto;max-height:62vh;box-shadow:var(--shadow)}
+table{width:100%;border-collapse:collapse;font-size:.76rem;min-width:4200px}
+thead{position:sticky;top:0;z-index:2}
+th{background:#1b1f29;padding:12px 9px;font-weight:700;text-align:right;color:var(--text2);font-size:.71rem;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:10px 9px;border-bottom:1px solid rgba(42,47,58,.62);white-space:nowrap}
+tr:hover td{background:rgba(20,184,166,.035)}
+.muted{color:var(--text3)}
+.pill{display:inline-block;padding:2px 8px;border-radius:5px;font-size:.68rem;font-weight:700}
+.pill.product{background:var(--accent-dim);color:var(--accent)}
+.pill.option{background:var(--amber-dim);color:var(--amber)}
+.empty{text-align:center;padding:36px;color:var(--text3);font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<main class="app">
+  <header class="hdr">
+    <div class="badge">SALLA NEW PRODUCTS TOOL</div>
+    <h1>منتجات المورد الجديدة</h1>
+    <p>ارفع ملف منتجات سلة الحالي + ملف المورد CSV + ملف أسعار المورد XLS، ثم اختر من الماركات الجديدة فقط ما تريد إدخاله. قالب سلة محفوظ داخل الموقع تلقائياً.</p>
+    <a class="top-link" href="index.html">الرجوع لتحديث الأسعار والكميات</a>
+  </header>
+
+  <div class="note">
+    <strong>مطابقة الجديد:</strong> نقارن SKU في CSV وXLS مع SKU في ملف منتجات سلة. يدخل فقط SKU الموجود في المصدرين وغير الموجود في سلة.<br>
+    <strong>الأسعار:</strong> السعر والتكلفة من ملف <span dir="ltr">AllFragrancesExcelList.xls</span> بالريال، أما CSV فهو للصور والوصف والـ Handle فقط.<br>
+    <strong>الماركات:</strong> منتجات الماركات الموجودة في سلة تدخل تلقائياً بنفس قيمة الماركة الموجودة في سلة، وتظهر لك فقط الماركات الجديدة لتحديد ما تريد إدخاله.<br>
+    <strong>الصور:</strong> أي رابط FragranceX بصيغة <span dir="ltr">/small/</span> يتم تحويله تلقائياً إلى <span dir="ltr">/large/</span> في ملف سلة الناتج.<br>
+    <strong>الخيارات:</strong> إذا كان المنتج له أكثر من حجم، يدخل كسطر أب بلا صورة وتحته الخيارات، وصور الخيارات فقط تكون داخل أعمدة الخيار.
+  </div>
+
+  <div class="uploads">
+    <div class="upload-zone" onclick="this.querySelector('input').click()" id="sallaZone">
+      <input type="file" id="sallaFile" accept=".xlsx,.xls" onchange="loadSallaProducts(event)">
+      <div class="ico">🏪</div>
+      <h3>ملف منتجات سلة الحالي</h3>
+      <div class="sub">aatir_products.xlsx</div>
+      <div class="file-info" id="sallaInfo"></div>
+    </div>
+    <div class="upload-zone" onclick="this.querySelector('input').click()" id="supplierZone">
+      <input type="file" id="supplierFile" accept=".csv" onchange="loadSupplierCsv(event)">
+      <div class="ico">📦</div>
+      <h3>ملف المورد CSV</h3>
+      <div class="sub">Shopify - All Fragrances.csv</div>
+      <div class="file-info" id="supplierInfo"></div>
+    </div>
+    <div class="upload-zone" onclick="this.querySelector('input').click()" id="priceListZone">
+      <input type="file" id="priceListFile" accept=".xls,.xlsx" onchange="loadPriceListXls(event)">
+      <div class="ico">💵</div>
+      <h3>ملف أسعار المورد XLS</h3>
+      <div class="sub">AllFragrancesExcelList.xls</div>
+      <div class="file-info" id="priceListInfo"></div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="analyzeBtn" disabled onclick="analyzeNewProducts()">تحليل المنتجات الجديدة</button>
+    <button class="btn" id="downloadBtn" disabled onclick="downloadNewProducts()">تحميل ملف المنتجات الجديدة</button>
+  </div>
+  <div class="progress" id="progress"><div class="bar" id="bar"></div></div>
+  <div class="log" id="logBox"></div>
+
+  <div class="stats" id="stats">
+    <div class="stat"><div class="n" id="stCsv">0</div><div class="l">SKU في CSV</div></div>
+    <div class="stat"><div class="n" id="stXls">0</div><div class="l">SKU في XLS</div></div>
+    <div class="stat"><div class="n" id="stExisting">0</div><div class="l">SKU في سلة</div></div>
+    <div class="stat"><div class="n" id="stNew" style="color:var(--amber)">0</div><div class="l">SKU قابلة للإنشاء</div></div>
+    <div class="stat"><div class="n" id="stExcluded" style="color:var(--red)">0</div><div class="l">XLS فقط مستبعد</div></div>
+    <div class="stat"><div class="n" id="stNewBrands">0</div><div class="l">ماركات جديدة</div></div>
+    <div class="stat"><div class="n" id="stSelected" style="color:var(--green)">0</div><div class="l">SKU مختارة</div></div>
+  </div>
+
+  <section class="panel" id="brandPanel">
+    <div class="panel-head">
+      <h2>اختيار الماركات الجديدة فقط</h2>
+      <input class="search" id="brandSearch" placeholder="بحث في الماركات الجديدة..." oninput="renderBrandChecks()">
+      <div class="actions" style="margin:0">
+        <button class="btn" onclick="setAllBrands(true)">تحديد كل الماركات الجديدة</button>
+        <button class="btn" onclick="setAllBrands(false)">إلغاء الكل</button>
+      </div>
+    </div>
+    <div class="brand-grid" id="brandChecks"></div>
+  </section>
+
+  <section class="panel" id="previewPanel">
+    <div class="panel-head">
+      <h2>معاينة المنتجات التي ستدخل ملف سلة</h2>
+      <span class="muted" id="previewNote"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>#</th>
+        </tr></thead>
+        <tbody id="previewBody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="emptyPreview" style="display:none">لا توجد منتجات ضمن الماركات المختارة</div>
+  </section>
+</main>
+
+<script>
+let sallaFile=null, supplierFile=null, priceListFile=null;
+let existingSkus=new Set(), existingBrands=new Set(), existingRowsBySku=new Map();
+let supplierRows=[], priceRows=[], missingRows=[], excludedXlsOnlyRows=[];
+let csvBySku=new Map(), priceBySku=new Map();
+let brandExactMap=new Map(), brandArabicMap=new Map(), newBrands=new Set(), selectedBrands=new Set();
+let rowCache=[];
+const TEMPLATE_URL='assets/salla-products-template.xlsx';
+const previewHeaders=[
+  'النوع','أسم المنتج','تصنيف المنتج','صورة المنتج','وصف صورة المنتج','نوع المنتج','سعر المنتج','الوصف',
+  'هل يتطلب شحن؟','رمز المنتج sku','سعر التكلفة','السعر المخفض','تاريخ بداية التخفيض','تاريخ نهاية التخفيض',
+  'اقصي كمية لكل عميل','إخفاء خيار تحديد الكمية','اضافة صورة عند الطلب','الوزن','وحدة الوزن','الماركة',
+  'العنوان الترويجي','تثبيت المنتج','الباركود','السعرات الحرارية','MPN','GTIN','خاضع للضريبة ؟',
+  'سبب عدم الخضوع للضريبة','[1] الاسم','[1] النوع','[1] القيمة','[1] الصورة / اللون','[2] الاسم',
+  '[2] النوع','[2] القيمة','[2] الصورة / اللون','[3] الاسم','[3] النوع','[3] القيمة','[3] الصورة / اللون'
+];
+
+function setProgress(pct){document.getElementById('progress').style.display='block';document.getElementById('bar').style.width=pct+'%';}
+function hideProgress(){setTimeout(()=>{document.getElementById('progress').style.display='none';},350)}
+function logMsg(msg){const box=document.getElementById('logBox');box.style.display='block';box.innerHTML+=msg+'<br>';box.scrollTop=box.scrollHeight;}
+function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+function cleanText(value){return String(value??'').replace(/\s+/g,' ').trim();}
+function cleanSku(value){
+  const text=cleanText(value);
+  if(/^\d+(?:\.0+)?$/.test(text))return text.replace(/\.0+$/,'');
+  return text.replace(/[^\dA-Za-z_-]/g,'');
+}
+function parseNumber(value){return parseFloat(String(value??'').replace(/[^0-9.-]/g,''))||0;}
+function round2(value){return Math.round(value*100)/100;}
+function largeImageUrl(url){
+  const text=String(url??'').trim();
+  return text.replace(/\/images\/products\/sku\/small\//i,'/images/products/SKU/large/');
+}
+function checkReady(){document.getElementById('analyzeBtn').disabled=!(sallaFile&&supplierFile&&priceListFile);}
+function readArrayBuffer(file){return file.arrayBuffer();}
+
+async function loadSallaProducts(event){
+  sallaFile=event.target.files[0];if(!sallaFile)return;
+  document.getElementById('sallaZone').classList.add('ok');
+  document.getElementById('sallaInfo').textContent=`تم اختيار ${sallaFile.name}`;
+  checkReady();
+}
+async function loadSupplierCsv(event){
+  supplierFile=event.target.files[0];if(!supplierFile)return;
+  document.getElementById('supplierZone').classList.add('ok');
+  document.getElementById('supplierInfo').textContent=`تم اختيار ${supplierFile.name}`;
+  checkReady();
+}
+async function loadPriceListXls(event){
+  priceListFile=event.target.files[0];if(!priceListFile)return;
+  document.getElementById('priceListZone').classList.add('ok');
+  document.getElementById('priceListInfo').textContent=`تم اختيار ${priceListFile.name}`;
+  checkReady();
+}
+async function workbookFromFile(file){
+  const workbook=new ExcelJS.Workbook();
+  await workbook.xlsx.load(await readArrayBuffer(file));
+  return workbook;
+}
+async function workbookFromTemplate(){
+  const response=await fetch(TEMPLATE_URL);
+  if(!response.ok)throw new Error('تعذر تحميل قالب سلة الافتراضي من الموقع');
+  const workbook=new ExcelJS.Workbook();
+  await workbook.xlsx.load(await response.arrayBuffer());
+  return workbook;
+}
+function cellText(cell){return cleanText(cell?.value?.text ?? cell?.value?.result ?? cell?.value ?? '');}
+function getWorksheetHeaderMap(worksheet){
+  const headers={};
+  worksheet.getRow(2).eachCell((cell,col)=>{const name=cellText(cell);if(name)headers[name]=col;});
+  return headers;
+}
+async function readExistingCatalog(){
+  const workbook=await workbookFromFile(sallaFile);
+  const worksheet=workbook.worksheets[0];
+  const headers=getWorksheetHeaderMap(worksheet);
+  const skuCol=headers['رمز المنتج sku'];
+  const brandCol=headers['الماركة'];
+  if(!skuCol)throw new Error('لم أجد عمود رمز المنتج sku في ملف سلة');
+  if(!brandCol)throw new Error('لم أجد عمود الماركة في ملف سلة');
+  const skus=new Set(), brands=new Set(), rowsBySku=new Map();
+  worksheet.eachRow((row,rowNumber)=>{
+    if(rowNumber<=2)return;
+    const sku=cleanSku(row.getCell(skuCol).value);
+    const item={};
+    for(const [header,col] of Object.entries(headers))item[header]=cellText(row.getCell(col));
+    if(sku&&!rowsBySku.has(sku))rowsBySku.set(sku,item);
+    if(sku)skus.add(sku);
+    const brand=cleanText(row.getCell(brandCol).value);
+    if(brand)brands.add(brand);
+  });
+  return{skus,brands,rowsBySku};
+}
+async function readSupplierRows(){
+  const text=await supplierFile.text();
+  const parsed=Papa.parse(text,{header:true,skipEmptyLines:true});
+  if(parsed.errors?.length)throw new Error(parsed.errors[0].message);
+  const bySku=new Map();
+  for(const row of parsed.data){
+    const sku=cleanSku(row['Variant SKU']);
+    if(sku&&!bySku.has(sku))bySku.set(sku,row);
+  }
+  return [...bySku.values()];
+}
+async function readPriceListRows(){
+  const workbook=XLSX.read(await readArrayBuffer(priceListFile),{type:'array',cellDates:false});
+  const sheet=workbook.Sheets[workbook.SheetNames[0]];
+  const matrix=XLSX.utils.sheet_to_json(sheet,{header:1,defval:''});
+  const headerIndex=matrix.findIndex(row=>{
+    const names=row.map(cleanText);
+    return names.includes('Item#')&&names.includes('Name')&&names.includes('Brand')&&names.includes('Size/Type')&&names.includes('Retail Price')&&names.includes('Cost');
+  });
+  if(headerIndex<0)throw new Error('لم أجد عناوين ملف الأسعار: Item#, Name, Brand, Size/Type, Retail Price, Cost');
+  const headers=matrix[headerIndex].map(cleanText);
+  const required=['Item#','Name','Brand','Size/Type','Gender','Retail Price','Cost'];
+  for(const header of required){
+    if(!headers.includes(header))throw new Error(`ملف الأسعار لا يحتوي عمود ${header}`);
+  }
+  const rows=[];
+  for(let i=headerIndex+1;i<matrix.length;i++){
+    const source=matrix[i];
+    const item={};
+    headers.forEach((header,col)=>{if(header)item[header]=source[col]??'';});
+    const sku=cleanSku(item['Item#']);
+    if(!sku)continue;
+    item._sku=sku;
+    rows.push(item);
+  }
+  return rows;
+}
+function mapBySku(rows, field){
+  const map=new Map();
+  for(const row of rows){
+    const sku=cleanSku(row[field]??row._sku);
+    if(sku&&!map.has(sku))map.set(sku,row);
+  }
+  return map;
+}
+function addNestedCount(bucket,key,value){
+  const cleanKey=cleanText(key), cleanValue=cleanText(value);
+  if(!cleanKey||!cleanValue)return;
+  if(!bucket.has(cleanKey))bucket.set(cleanKey,new Map());
+  const counts=bucket.get(cleanKey);
+  counts.set(cleanValue,(counts.get(cleanValue)||0)+1);
+}
+function mostCommon(counts){
+  let chosen='', score=-1;
+  for(const [value,count] of counts){
+    if(count>score){chosen=value;score=count;}
+  }
+  return chosen;
+}
+function countsToMap(bucket){
+  const map=new Map();
+  for(const [key,counts] of bucket)map.set(key,mostCommon(counts));
+  return map;
+}
+function extractArabicBrand(name){
+  const text=cleanText(name);
+  const genderMatch=text.match(/\sمن\s+(.+?)\s+(?:للرجال|للنساء|للجنسين|للاطفال|للأطفال)(?:\s|$|-)/);
+  if(genderMatch)return cleanText(genderMatch[1]);
+  const dashMatch=text.match(/\sمن\s+(.+?)(?:\s+-|$)/);
+  return dashMatch?cleanText(dashMatch[1]):'';
+}
+function buildBrandMaps(){
+  const exactCounts=new Map(), arabicCounts=new Map();
+  for(const row of priceRows){
+    const sallaRow=existingRowsBySku.get(cleanSku(row['Item#']));
+    if(!sallaRow)continue;
+    addNestedCount(exactCounts,row.Brand,sallaRow['الماركة']);
+    addNestedCount(arabicCounts,row.Brand,extractArabicBrand(sallaRow['أسم المنتج']));
+  }
+  brandExactMap=countsToMap(exactCounts);
+  brandArabicMap=countsToMap(arabicCounts);
+}
+async function analyzeNewProducts(){
+  try{
+    setProgress(10);
+    document.getElementById('logBox').innerHTML='';
+    document.getElementById('downloadBtn').disabled=true;
+    const catalog=await readExistingCatalog();
+    existingSkus=catalog.skus;
+    existingBrands=catalog.brands;
+    existingRowsBySku=catalog.rowsBySku;
+    setProgress(35);
+    supplierRows=await readSupplierRows();
+    priceRows=await readPriceListRows();
+    csvBySku=mapBySku(supplierRows,'Variant SKU');
+    priceBySku=mapBySku(priceRows,'Item#');
+    buildBrandMaps();
+    setProgress(62);
+    missingRows=[];
+    for(const [sku,csvRow] of csvBySku){
+      const xlsRow=priceBySku.get(sku);
+      if(!xlsRow||existingSkus.has(sku))continue;
+      csvRow._xls=xlsRow;
+      missingRows.push(csvRow);
+    }
+    excludedXlsOnlyRows=[];
+    for(const [sku,xlsRow] of priceBySku){
+      if(!existingSkus.has(sku)&&!csvBySku.has(sku))excludedXlsOnlyRows.push(xlsRow);
+    }
+    newBrands=new Set(missingRows
+      .filter(row=>!existingBrands.has(outputBrandFor(row)))
+      .map(brandKey)
+      .filter(Boolean));
+    selectedBrands=new Set();
+    setProgress(85);
+    document.getElementById('stCsv').textContent=csvBySku.size.toLocaleString();
+    document.getElementById('stXls').textContent=priceBySku.size.toLocaleString();
+    document.getElementById('stExisting').textContent=existingSkus.size.toLocaleString();
+    document.getElementById('stNew').textContent=missingRows.length.toLocaleString();
+    document.getElementById('stExcluded').textContent=excludedXlsOnlyRows.length.toLocaleString();
+    document.getElementById('stNewBrands').textContent=newBrands.size.toLocaleString();
+    document.getElementById('stats').style.display='grid';
+    document.getElementById('brandPanel').classList.add('on');
+    document.getElementById('previewPanel').classList.add('on');
+    renderBrandChecks();
+    updatePreview();
+    logMsg(`تمت قراءة ${csvBySku.size.toLocaleString()} SKU من CSV و${priceBySku.size.toLocaleString()} SKU من XLS`);
+    logMsg(`قابلة للإنشاء: ${missingRows.length.toLocaleString()} SKU موجودة في CSV وXLS وغير موجودة في سلة`);
+    logMsg(`مستبعدة: ${excludedXlsOnlyRows.length.toLocaleString()} SKU موجودة في XLS فقط بلا صورة/وصف من CSV`);
+    logMsg(`الماركات الجديدة غير الموجودة في سلة: ${newBrands.size.toLocaleString()} ماركة`);
+    document.getElementById('downloadBtn').disabled=missingRows.length===0;
+    setProgress(100);hideProgress();
+  }catch(error){
+    hideProgress();
+    logMsg(`❌ ${escapeHtml(error.message)}`);
+  }
+}
+function brandKey(row){
+  const xls=row._xls||row;
+  return cleanText(xls.Brand||row.Vendor||'بدون ماركة')||'بدون ماركة';
+}
+function outputBrandFor(row){
+  const key=brandKey(row);
+  return brandExactMap.get(key)||key;
+}
+function normalBrand(row){return outputBrandFor(row);}
+function arabicBrandFor(row){
+  const key=typeof row==='string'?row:brandKey(row);
+  return brandArabicMap.get(key)||key;
+}
+function brandCounts(){
+  const counts=new Map();
+  for(const row of missingRows){
+    const key=brandKey(row);
+    if(!newBrands.has(key))continue;
+    counts.set(key,(counts.get(key)||0)+1);
+  }
+  return [...counts.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
+}
+function renderBrandChecks(){
+  const q=document.getElementById('brandSearch').value.trim().toLowerCase();
+  const box=document.getElementById('brandChecks');
+  box.innerHTML='';
+  const counts=brandCounts();
+  if(!counts.length){
+    box.innerHTML='<div class="empty">لا توجد ماركات جديدة. كل المنتجات القابلة للإنشاء تابعة لماركات موجودة في سلة.</div>';
+    return;
+  }
+  for(const [brand,count] of counts){
+    const label=brandExactMap.get(brand)||brand;
+    const searchable=`${brand} ${label}`.toLowerCase();
+    if(q&&!searchable.includes(q))continue;
+    const id='brand_'+btoa(unescape(encodeURIComponent(brand))).replace(/=+$/,'');
+    box.insertAdjacentHTML('beforeend',`<div class="brand-item">
+      <label title="${escapeHtml(label)}">
+        <input type="checkbox" id="${id}" data-brand="${escapeHtml(brand)}" ${selectedBrands.has(brand)?'checked':''} onchange="toggleBrand(this.dataset.brand,this.checked)">
+        <span class="brand-name">${escapeHtml(label)}</span>
+      </label>
+      <span class="count">${count.toLocaleString()}</span>
+    </div>`);
+  }
+}
+function toggleBrand(brand,checked){
+  if(checked)selectedBrands.add(brand);else selectedBrands.delete(brand);
+  updatePreview();
+}
+function setAllBrands(checked){
+  if(checked)selectedBrands=new Set(newBrands);
+  else selectedBrands.clear();
+  renderBrandChecks();
+  updatePreview();
+}
+function selectedRows(){
+  return missingRows.filter(row=>{
+    const brand=outputBrandFor(row);
+    return existingBrands.has(brand)||selectedBrands.has(brandKey(row));
+  });
+}
+function typeText(row){
+  const xls=row._xls||row;
+  return cleanText(xls['Size/Type']);
+}
+function genderPhrase(row){
+  const xls=row._xls||row;
+  const gender=cleanText(xls.Gender).toLowerCase();
+  const size=typeText(row).toLowerCase();
+  if(gender.includes('women')||gender.includes('female'))return 'للنساء';
+  if(gender.includes('men')||gender.includes('male'))return 'للرجال';
+  if(gender.includes('unisex')||size.includes('unisex'))return 'للجنسين';
+  return 'للجنسين';
+}
+function typeWithoutSize(sizeType){
+  return cleanText(sizeType)
+    .replace(/^\d+(?:\.\d+)?\s*(?:ml|مل|ملل)\s*/i,'')
+    .replace(/^\d+(?:\.\d+)?\s*oz\.?\s*/i,'')
+    .replace(/^\d+(?:\.\d+)?\s*(?:ml|oz\.?)\s*\/\s*\d+(?:\.\d+)?\s*oz\.?\s*/i,'')
+    .trim();
+}
+function arabicType(row){
+  const raw=typeText(row);
+  const base=typeWithoutSize(raw);
+  const lower=base.toLowerCase();
+  const tester=/tester|unboxed|without box/.test(lower);
+  let label='';
+  if(lower.includes('deodorant'))label='مزيل رائحة العطر';
+  else if(lower.includes('after shave')||lower.includes('aftershave'))label='بعد الحلاقة';
+  else if(lower.includes('body spray')||lower.includes('body mist')||lower.includes('fragrance mist'))label='رذاذ للجسم';
+  else if(lower.includes('body lotion'))label='لوشن للجسم';
+  else if(lower.includes('shower gel')||lower.includes('bath')||lower.includes('soap'))label='استخدام للجسم';
+  else if(lower.includes('eau de parfum')||/\bedp\b/.test(lower))label='او دو برفيوم';
+  else if(lower.includes('eau de toilette')||/\bedt\b/.test(lower))label='او دو تواليت';
+  else if(lower.includes('eau de cologne')||lower.includes('cologne spray')||/\bedc\b/.test(lower))label='او دو كلون';
+  else if(lower.includes('eau fraiche'))label='او فريش';
+  else if(lower.includes('parfum'))label='برفيوم';
+  else if(lower.includes('perfume oil')||lower.includes('fragrance oil'))label='زيت عطري';
+  else if(lower.includes('vial')||lower.includes('sample')||lower.includes('mini'))label='عينة عطر';
+  else label=base.replace(/\s*\(.*?\)\s*/g,'').trim();
+  if(tester&&label&&!label.includes('بدون كرتون'))label+=' - بدون كرتون';
+  return label;
+}
+function sizeMl(row){
+  const text=typeText(row);
+  const ml=text.match(/(\d+(?:\.\d+)?)\s*ml/i);
+  if(ml)return `${formatNumber(parseFloat(ml[1]))} ملل`;
+  const oz=text.match(/(\d+(?:\.\d+)?)\s*oz/i);
+  if(!oz)return '';
+  const converted=parseFloat(oz[1])*29.5735295625;
+  const common=[1,2,3,5,7.5,10,15,30,40,50,60,75,80,90,100,120,125,150,200,240,250,300,500];
+  const nearest=common.reduce((best,item)=>Math.abs(item-converted)<Math.abs(best-converted)?item:best,common[0]);
+  const value=Math.abs(nearest-converted)<=3?nearest:Math.round(converted);
+  return `${formatNumber(value)} ملل`;
+}
+function formatNumber(value){
+  return Number.isInteger(value)?String(value):String(round2(value)).replace(/\.?0+$/,'');
+}
+function categoryFor(row){
+  const text=`${typeText(row)} ${row._xls?.Name||''}`.toLowerCase();
+  if(text.includes('deodorant'))return 'مزيل العرق';
+  if(text.includes('after shave')||text.includes('aftershave'))return 'بعد الحلاقة';
+  if(text.includes('body')||text.includes('mist')||text.includes('lotion')||text.includes('shower')||text.includes('bath')||text.includes('soap'))return 'استخدام للجسم';
+  const gender=genderPhrase(row);
+  if(gender==='للرجال')return 'عطور رجالية';
+  if(gender==='للنساء')return 'عطور نسائية';
+  return 'عطور للجنسين';
+}
+function calcPrice(cost){
+  const base=cost<200?cost*1.8:cost*1.6;
+  if(base<10)return round2(base+10);
+  if(base<50)return round2(base+35);
+  if(base<100)return round2(base+60);
+  if(base<200)return round2(base+70);
+  return round2(base+80);
+}
+function pricePack(row){
+  const source=row._xls||row;
+  const cost=round2(parseNumber(source['Cost']));
+  const retail=round2(parseNumber(source['Retail Price']));
+  const calculated=calcPrice(cost);
+  const useRetail=retail>0&&calculated<retail;
+  return useRetail
+    ? {price:retail,cost,sale:calculated}
+    : {price:calculated,cost,sale:''};
+}
+function uniqueValues(values){return [...new Set(values.filter(Boolean))];}
+function groupsByHandle(rows){
+  const map=new Map();
+  for(const row of rows){
+    const key=row.Handle||`${row._xls?.Brand||''}|${row._xls?.Name||''}`||cleanSku(row['Variant SKU']);
+    if(!map.has(key))map.set(key,[]);
+    map.get(key).push(row);
+  }
+  return [...map.values()];
+}
+function productName(rows){
+  const first=rows[0];
+  const base=cleanText(first._xls?.Name||first.Title||first.Handle).replace(/^عطر\s+/,'');
+  const brand=arabicBrandFor(first);
+  const type=arabicType(first);
+  const suffix=type?` - ${type}`:'';
+  return `عطر ${base} من ${brand} ${genderPhrase(first)}${suffix}`;
+}
+function productImages(rows){return uniqueValues(rows.map(row=>largeImageUrl(row['Image Src']))).join(',');}
+function productWeight(row){
+  const grams=parseNumber(row['Variant Grams']);
+  return grams?round2(grams/1000):0.5;
+}
+function shippingValue(row){
+  return String(row['Variant Requires Shipping']).toUpperCase()==='FALSE'?'لا':'نعم';
+}
+function productMainRow(rows){
+  const first=rows[0], prices=rows.map(pricePack);
+  const activePrices=prices.map(p=>Number(p.sale||p.price)||0).filter(Boolean);
+  const minPrice=activePrices.length?Math.min(...activePrices):0;
+  const chosen=prices.find(p=>Number(p.sale||p.price)===minPrice)||prices[0]||{price:'',cost:'',sale:''};
+  const isVariant=rows.length>1;
+  const title=productName(rows);
+  return {
+    type:'منتج', name:title, category:categoryFor(first), image:isVariant?'':productImages(rows),
+    alt:first['Image Alt Text']||title, ready:'منتج جاهز', price:chosen.price,
+    desc:first['Body (HTML)']||'', shipping:shippingValue(first),
+    sku:cleanSku(first['Variant SKU']), cost:chosen.cost, sale:chosen.sale,
+    addImage:'لا', weight:productWeight(first), unit:'kg',
+    brand:outputBrandFor(first), promo:sizeMl(first)||first['Option1 Value']||'', pinned:'لا', barcode:first['Variant Barcode']||'',
+    taxable:'نعم', optName:isVariant?'الحجم':'', optType:isVariant?'صورة':'', optValue:'', optImage:''
+  };
+}
+function optionRow(row, productTitle){
+  const p=pricePack(row);
+  return {
+    type:'خيار', name:productTitle, category:'', image:'', alt:'', ready:'', price:p.price, desc:'',
+    shipping:'', sku:cleanSku(row['Variant SKU']), cost:p.cost, sale:p.sale,
+    addImage:'', weight:'', unit:'', brand:'', promo:'', pinned:'', barcode:row['Variant Barcode']||'',
+    taxable:'', optName:'', optType:'', optValue:sizeMl(row)||row['Option1 Value']||'', optImage:largeImageUrl(row['Image Src'])
+  };
+}
+function buildOutputRows(rows){
+  const out=[];
+  for(const group of groupsByHandle(rows)){
+    out.push(productMainRow(group));
+    if(group.length>1){
+      const title=productName(group);
+      for(const row of group)out.push(optionRow(row,title));
+    }
+  }
+  return out;
+}
+function updatePreview(){
+  const rows=selectedRows();
+  rowCache=buildOutputRows(rows);
+  document.getElementById('stSelected').textContent=rows.length.toLocaleString();
+  document.getElementById('previewNote').textContent=`${rows.length.toLocaleString()} SKU مختارة، ${rowCache.length.toLocaleString()} صف في الملف. تظهر أول ${Math.min(rowCache.length,400).toLocaleString()} صف للمعاينة.`;
+  const body=document.getElementById('previewBody');
+  const empty=document.getElementById('emptyPreview');
+  const headRow=document.querySelector('#previewPanel thead tr');
+  if(headRow.children.length===1){
+    previewHeaders.forEach(header=>headRow.insertAdjacentHTML('beforeend',`<th>${escapeHtml(header)}</th>`));
+  }
+  body.innerHTML='';
+  if(!rowCache.length){empty.style.display='block';return;}
+  empty.style.display='none';
+  rowCache.slice(0,400).forEach((row,idx)=>{
+    const cells=templateRowArray(row).map(value=>`<td>${escapeHtml(value)}</td>`).join('');
+    body.insertAdjacentHTML('beforeend',`<tr><td>${idx+1}</td>${cells}</tr>`);
+  });
+}
+function templateRowArray(row){
+  return [
+    row.type,row.name,row.category,row.image,row.alt,row.ready,row.price,row.desc,row.shipping,row.sku,
+    row.cost,row.sale,'','', '', '', row.addImage,row.weight,row.unit,row.brand,row.promo,row.pinned,
+    row.barcode,'','','',row.taxable,'',row.optName,row.optType,row.optValue,row.optImage,'','','','','','','',''
+  ];
+}
+function cloneStyle(style){return style?JSON.parse(JSON.stringify(style)):{};}
+function applyStyle(row, styleTemplate){
+  row.eachCell({includeEmpty:true},(cell,col)=>{
+    if(styleTemplate[col])cell.style=cloneStyle(styleTemplate[col]);
+  });
+}
+function captureRowStyle(worksheet,rowNumber){
+  const styles={};
+  worksheet.getRow(rowNumber).eachCell({includeEmpty:true},(cell,col)=>{styles[col]=cloneStyle(cell.style);});
+  return styles;
+}
+async function downloadNewProducts(){
+  try{
+    const rows=selectedRows();
+    if(!rows.length){logMsg('❌ لا توجد منتجات مختارة للتصدير');return;}
+    setProgress(10);
+    const workbook=await workbookFromTemplate();
+    const worksheet=workbook.worksheets[0];
+    const productStyle=captureRowStyle(worksheet,3);
+    const optionStyle=captureRowStyle(worksheet,4);
+    const productHeight=worksheet.getRow(3).height;
+    const optionHeight=worksheet.getRow(4).height;
+    const removeCount=Math.max(worksheet.rowCount-2,0);
+    if(removeCount>0)worksheet.spliceRows(3,removeCount);
+    setProgress(35);
+    const outputRows=buildOutputRows(rows);
+    for(const item of outputRows){
+      const excelRow=worksheet.addRow(templateRowArray(item));
+      excelRow.height=item.type==='منتج'?productHeight:optionHeight;
+      applyStyle(excelRow,item.type==='منتج'?productStyle:optionStyle);
+    }
+    setProgress(75);
+    const buffer=await workbook.xlsx.writeBuffer();
+    const blob=new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const anchor=document.createElement('a');
+    anchor.href=URL.createObjectURL(blob);
+    anchor.download=`salla_new_products_${new Date().toISOString().slice(0,10)}.xlsx`;
+    anchor.click();
+    URL.revokeObjectURL(anchor.href);
+    setProgress(100);hideProgress();
+    logMsg(`تم تجهيز ملف يحتوي ${rows.length.toLocaleString()} SKU جديدة و${outputRows.length.toLocaleString()} صف`);
+  }catch(error){
+    hideProgress();
+    logMsg(`❌ ${escapeHtml(error.message)}`);
+  }
+}
+</script>
+</body>
+</html>
