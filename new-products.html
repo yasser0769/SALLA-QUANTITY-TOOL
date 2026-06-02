@@ -29,7 +29,7 @@ h1{font-size:clamp(1.55rem,3vw,2.1rem);font-weight:700;margin-bottom:8px}
 .note,.panel{background:linear-gradient(180deg,rgba(24,27,35,.98),rgba(18,20,26,.98));border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 12px 28px rgba(0,0,0,.14)}
 .note{border-inline-start:3px solid var(--accent);padding:17px 20px;margin-bottom:20px;font-size:.82rem;color:var(--text2);line-height:1.95}
 .note strong{color:var(--text)}
-.uploads{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
+.uploads{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
 @media(max-width:860px){.uploads{grid-template-columns:1fr}}
 .upload-zone{background:linear-gradient(180deg,var(--surface2),var(--surface));border:1px dashed var(--border2);border-radius:var(--radius);padding:24px 18px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s,transform .2s,box-shadow .2s;min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .upload-zone:hover{border-color:var(--accent);background:#1a1e27;transform:translateY(-2px);box-shadow:var(--shadow)}
@@ -103,14 +103,14 @@ tr:hover td{background:rgba(20,184,166,.035)}
   <header class="hdr">
     <div class="badge">SALLA NEW PRODUCTS TOOL</div>
     <h1>منتجات المورد الجديدة</h1>
-    <p>ارفع ملف منتجات سلة الحالي + ملف المورد CSV + ملف أسعار المورد XLS، ثم اختر من الماركات الجديدة فقط ما تريد إدخاله. قالب سلة محفوظ داخل الموقع تلقائياً.</p>
+    <p>ارفع ملف منتجات سلة الحالي + ملف المورد CSV + ملف أسعار المورد XLS، ويمكنك إضافة ملف الماركات اختياريًا لتحديد ماركاته تلقائيًا. قالب سلة محفوظ داخل الموقع تلقائياً.</p>
     <a class="top-link" href="index.html">الرجوع لتحديث الأسعار والكميات</a>
   </header>
 
   <div class="note">
     <strong>مطابقة الجديد:</strong> نقارن SKU في CSV وXLS مع SKU في ملف منتجات سلة. يدخل فقط SKU الموجود في المصدرين وغير الموجود في سلة.<br>
     <strong>الأسعار:</strong> السعر والتكلفة من ملف <span dir="ltr">AllFragrancesExcelList.xls</span> بالريال، أما CSV فهو للصور والوصف والـ Handle فقط.<br>
-    <strong>الماركات:</strong> منتجات الماركات الموجودة في سلة تدخل تلقائياً بنفس قيمة الماركة الموجودة في سلة، وتظهر لك فقط الماركات الجديدة لتحديد ما تريد إدخاله.<br>
+    <strong>الماركات:</strong> منتجات الماركات الموجودة في سلة تدخل تلقائياً، وإذا رفعت ملف الماركات تدخل ماركاته تلقائياً أيضاً، والمتبقي يظهر لك للاختيار اليدوي.<br>
     <strong>الصور:</strong> أي رابط FragranceX بصيغة <span dir="ltr">/small/</span> يتم تحويله تلقائياً إلى <span dir="ltr">/large/</span> في ملف سلة الناتج.<br>
     <strong>الخيارات:</strong> إذا كان المنتج له أكثر من حجم، يدخل كسطر أب بلا صورة وتحته الخيارات، وصور الخيارات فقط تكون داخل أعمدة الخيار.
   </div>
@@ -136,6 +136,13 @@ tr:hover td{background:rgba(20,184,166,.035)}
       <h3>ملف أسعار المورد XLS</h3>
       <div class="sub">AllFragrancesExcelList.xls</div>
       <div class="file-info" id="priceListInfo"></div>
+    </div>
+    <div class="upload-zone" onclick="this.querySelector('input').click()" id="brandFileZone">
+      <input type="file" id="brandFile" accept=".xlsx,.xls" onchange="loadBrandFile(event)">
+      <div class="ico">🏷️</div>
+      <h3>ملف الماركات (اختياري)</h3>
+      <div class="sub">brands.xlsx</div>
+      <div class="file-info" id="brandFileInfo"></div>
     </div>
   </div>
 
@@ -255,11 +262,12 @@ tr:hover td{background:rgba(20,184,166,.035)}
 </main>
 
 <script>
-let sallaFile=null, supplierFile=null, priceListFile=null;
+let sallaFile=null, supplierFile=null, priceListFile=null, brandFile=null;
 let existingSkus=new Set(), existingBrands=new Set(), existingRowsBySku=new Map();
-let supplierRows=[], priceRows=[], missingRows=[], excludedXlsOnlyRows=[];
+let supplierRows=[], priceRows=[], brandFileRows=[], missingRows=[], excludedXlsOnlyRows=[];
 let csvBySku=new Map(), priceBySku=new Map();
 let brandExactMap=new Map(), brandArabicMap=new Map(), newBrands=new Set(), selectedBrands=new Set();
+let brandFileExactMap=new Map(), brandFileSelectedBrands=new Set();
 let rowCache=[];
 let currentStep='preview', translationStates=new Map(), previewRenderToken=0;
 let translationPaused=false, translationRunning=false;
@@ -294,6 +302,12 @@ function hideProgress(){setTimeout(()=>{document.getElementById('progress').styl
 function logMsg(msg){const box=document.getElementById('logBox');box.style.display='block';box.innerHTML+=msg+'<br>';box.scrollTop=box.scrollHeight;}
 function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
 function cleanText(value){return String(value??'').replace(/\s+/g,' ').trim();}
+function cleanBrandMatchKey(value){
+  return cleanText(value)
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^\dA-Za-z\u0600-\u06FF]+/g,'');
+}
 function cleanSku(value){
   const text=cleanText(value);
   if(/^\d+(?:\.0+)?$/.test(text))return text.replace(/\.0+$/,'');
@@ -356,6 +370,11 @@ async function loadPriceListXls(event){
   document.getElementById('priceListZone').classList.add('ok');
   document.getElementById('priceListInfo').textContent=`تم اختيار ${priceListFile.name}`;
   checkReady();
+}
+async function loadBrandFile(event){
+  brandFile=event.target.files[0];if(!brandFile)return;
+  document.getElementById('brandFileZone').classList.add('ok');
+  document.getElementById('brandFileInfo').textContent=`تم اختيار ${brandFile.name}`;
 }
 async function workbookFromFile(file){
   const workbook=new ExcelJS.Workbook();
@@ -444,6 +463,27 @@ async function readPriceListRows(){
   }
   return rows;
 }
+async function readBrandFileRows(){
+  if(!brandFile)return[];
+  const workbook=XLSX.read(await readArrayBuffer(brandFile),{type:'array',cellDates:false});
+  const sheet=workbook.Sheets[workbook.SheetNames[0]];
+  const matrix=XLSX.utils.sheet_to_json(sheet,{header:1,defval:''});
+  const headerIndex=matrix.findIndex(row=>row.map(cleanText).includes('اسم الماركة'));
+  if(headerIndex<0)throw new Error('لم أجد عمود اسم الماركة في ملف الماركات');
+  const headers=matrix[headerIndex].map(cleanText);
+  const brandCol=headers.indexOf('اسم الماركة');
+  const rows=[];
+  for(let i=headerIndex+1;i<matrix.length;i++){
+    const source=matrix[i];
+    const item={};
+    headers.forEach((header,col)=>{if(header)item[header]=source[col]??'';});
+    const brand=cleanText(source[brandCol]);
+    if(!brand)continue;
+    item._brandName=brand;
+    rows.push(item);
+  }
+  return rows;
+}
 function mapBySku(rows, field){
   const map=new Map();
   for(const row of rows){
@@ -470,6 +510,36 @@ function countsToMap(bucket){
   const map=new Map();
   for(const [key,counts] of bucket)map.set(key,mostCommon(counts));
   return map;
+}
+function addBrandFileKey(map,key,brand){
+  const cleanKey=cleanBrandMatchKey(key);
+  if(cleanKey&&!map.has(cleanKey))map.set(cleanKey,brand);
+}
+function brandFileKeysForRow(row){
+  const name=cleanText(row['اسم الماركة']||row._brandName);
+  const seo=cleanText(row['(SEO Page URL) رابط صفحة العلامة التجارية']);
+  const values=[name,seo];
+  for(const value of [name,seo]){
+    const decoded=decodeURIComponentSafe(value);
+    if(decoded&&decoded!==value)values.push(decoded);
+    const pathPart=decoded.split(/[/?#]/).filter(Boolean).pop()||'';
+    if(pathPart&&pathPart!==decoded)values.push(pathPart);
+    decoded.split(/\s*[-–—|/]\s*/).forEach(part=>values.push(part));
+  }
+  return [...new Set(values.map(cleanText).filter(Boolean))];
+}
+function decodeURIComponentSafe(value){
+  try{return decodeURIComponent(String(value??''));}
+  catch(error){return String(value??'');}
+}
+function buildBrandFileMap(){
+  brandFileExactMap=new Map();
+  brandFileSelectedBrands=new Set();
+  for(const row of brandFileRows){
+    const brand=cleanText(row['اسم الماركة']||row._brandName);
+    if(!brand)continue;
+    for(const key of brandFileKeysForRow(row))addBrandFileKey(brandFileExactMap,key,brand);
+  }
 }
 function extractArabicBrand(name){
   const text=cleanText(name);
@@ -503,8 +573,10 @@ async function analyzeNewProducts(){
     setProgress(35);
     supplierRows=await readSupplierRows();
     priceRows=await readPriceListRows();
+    brandFileRows=await readBrandFileRows();
     csvBySku=mapBySku(supplierRows,'Variant SKU');
     priceBySku=mapBySku(priceRows,'Item#');
+    buildBrandFileMap();
     buildBrandMaps();
     setProgress(62);
     missingRows=[];
@@ -518,8 +590,10 @@ async function analyzeNewProducts(){
     for(const [sku,xlsRow] of priceBySku){
       if(!existingSkus.has(sku)&&!csvBySku.has(sku))excludedXlsOnlyRows.push(xlsRow);
     }
+    const brandFileSkuRows=missingRows.filter(isBrandFileSelected);
+    brandFileSelectedBrands=new Set(brandFileSkuRows.map(brandKey).filter(Boolean));
     newBrands=new Set(missingRows
-      .filter(row=>!existingBrands.has(outputBrandFor(row)))
+      .filter(row=>!existingBrands.has(outputBrandFor(row))&&!isBrandFileSelected(row))
       .map(brandKey)
       .filter(Boolean));
     selectedBrands=new Set();
@@ -537,9 +611,13 @@ async function analyzeNewProducts(){
     renderBrandChecks();
     updatePreview();
     logMsg(`تمت قراءة ${csvBySku.size.toLocaleString()} SKU من CSV و${priceBySku.size.toLocaleString()} SKU من XLS`);
+    if(brandFile){
+      logMsg(`ملف الماركات: ${brandFileRows.length.toLocaleString()} ماركة مقروءة، ${brandFileSelectedBrands.size.toLocaleString()} ماركة طابقت المورد تلقائياً`);
+      logMsg(`أضيفت تلقائياً من ملف الماركات: ${filterRowsWithImages(brandFileSkuRows).length.toLocaleString()} SKU صالحة`);
+    }
     logMsg(`قابلة للإنشاء: ${missingRows.length.toLocaleString()} SKU موجودة في CSV وXLS وغير موجودة في سلة`);
     logMsg(`مستبعدة: ${excludedXlsOnlyRows.length.toLocaleString()} SKU موجودة في XLS فقط بلا صورة/وصف من CSV`);
-    logMsg(`الماركات الجديدة غير الموجودة في سلة: ${newBrands.size.toLocaleString()} ماركة`);
+    logMsg(`الماركات الجديدة المتبقية للاختيار اليدوي: ${newBrands.size.toLocaleString()} ماركة`);
     document.getElementById('downloadBtn').disabled=missingRows.length===0;
     document.getElementById('nextTranslationBtn').disabled=missingRows.length===0;
     setProgress(100);hideProgress();
@@ -554,8 +632,9 @@ function brandKey(row){
 }
 function outputBrandFor(row){
   const key=brandKey(row);
-  return brandExactMap.get(key)||key;
+  return brandExactMap.get(key)||brandFileExactMap.get(cleanBrandMatchKey(key))||key;
 }
+function isBrandFileSelected(row){return brandFileExactMap.has(cleanBrandMatchKey(brandKey(row)));}
 function normalBrand(row){return outputBrandFor(row);}
 function arabicBrandFor(row){
   const key=typeof row==='string'?row:brandKey(row);
@@ -606,7 +685,7 @@ function setAllBrands(checked){
 function selectedRows(){
   return missingRows.filter(row=>{
     const brand=outputBrandFor(row);
-    return existingBrands.has(brand)||selectedBrands.has(brandKey(row));
+    return existingBrands.has(brand)||isBrandFileSelected(row)||selectedBrands.has(brandKey(row));
   });
 }
 function translationKeyForRow(row){
@@ -1005,7 +1084,7 @@ function productMainRow(rows){
     type:'منتج', name:title, category, image:isVariant?'':productImages(rows),
     alt:cleanImageAltText(first['Image Alt Text']||title), ready:'منتج جاهز', price:chosen.price,
     desc:translatedDescriptionFor(translationKey)||first['Body (HTML)']||'', shipping:shippingValue(first),
-    sku:cleanSku(first['Variant SKU']), cost:chosen.cost, sale:chosen.sale,
+    sku:isVariant?'':cleanSku(first['Variant SKU']), cost:chosen.cost, sale:chosen.sale,
     addImage:'لا', weight:productWeight(first), unit:'kg',
     brand, promo:sizeMl(first)||first['Option1 Value']||'', pinned:'لا', barcode:first['Variant Barcode']||'',
     taxable:'نعم', optName:isVariant?'الحجم':'', optType:isVariant?'صورة':'', optValue:'', optImage:'',
@@ -1160,7 +1239,7 @@ function updatePreview(){
 function templateRowArray(row){
   return [
     row.type,row.name,row.category,row.image,row.alt,row.ready,row.price,row.desc,row.shipping,row.sku,
-    row.cost,row.sale,'','', '', '', row.addImage,row.weight,row.unit,row.brand,row.promo,row.pinned,
+    row.cost,row.sale,'','',10000,'',row.addImage,row.weight,row.unit,row.brand,row.promo,row.pinned,
     row.barcode,'','','',row.taxable,'',row.optName,row.optType,row.optValue,row.optImage,'','','','','','','',''
   ];
 }

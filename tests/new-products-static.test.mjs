@@ -13,12 +13,19 @@ function notHas(pattern, message) {
 
 has(/cdn\.jsdelivr\.net\/npm\/xlsx@/, 'SheetJS must be loaded for browser XLS parsing');
 has(/let\s+[^;]*priceListFile/, 'page state must include the XLS price-list file');
+has(/let\s+[^;]*brandFile/, 'page state must include the optional brand file');
 has(/function\s+loadPriceListXls/, 'page must expose an XLS upload loader');
+has(/function\s+loadBrandFile/, 'page must expose an optional brand-file upload loader');
 has(/function\s+readPriceListRows/, 'page must parse XLS supplier price-list rows');
+has(/function\s+readBrandFileRows/, 'page must parse optional brand-file rows');
 has(/priceBySku/, 'page must build an Item# -> XLS row map');
 has(/excludedXlsOnlyRows/, 'page must report XLS-only SKUs excluded from export');
 has(/brandExactMap/, 'page must map XLS brands to exact Salla brand values');
 has(/brandArabicMap/, 'page must map XLS brands to Arabic product-name phrases');
+has(/brandFileExactMap/, 'page must map optional brand-file keys to Salla brand names');
+has(/function\s+brandFileKeysForRow/, 'page must derive brand-file matching keys from brand name and SEO URL');
+has(/id="brandFile"/, 'page must include an optional brand-file upload input');
+has(/id="brandFileInfo"/, 'page must show selected optional brand-file information');
 has(/function\s+sizeMl/, 'page must derive Arabic ml size values from Size/Type');
 has(/function\s+arabicType/, 'page must derive Arabic perfume/type labels from Size/Type');
 has(/stCsv/, 'stats must include CSV SKU count');
@@ -28,6 +35,9 @@ has(/const\s+TEMPLATE_BASE64='[^']{1000,}'/, 'page must embed a template fallbac
 has(/function\s+base64ToArrayBuffer/, 'page must decode embedded template fallback');
 has(/catch\s*\([^)]*\)\s*\{[\s\S]*TEMPLATE_BASE64/, 'workbookFromTemplate must fallback when fetch fails');
 
+const checkReadyBody = html.match(/function\s+checkReady\s*\(\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
+assert.ok(!checkReadyBody.includes('brandFile'), 'optional brand file must not be required before analysis');
+
 const pricePackBody = html.match(/function\s+pricePack\s*\([^)]*\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
 assert.ok(pricePackBody.includes("['Cost']") || pricePackBody.includes('.Cost'), 'pricePack must use XLS Cost');
 assert.ok(pricePackBody.includes("['Retail Price']") || pricePackBody.includes('Retail Price'), 'pricePack must use XLS Retail Price');
@@ -35,6 +45,7 @@ assert.ok(!pricePackBody.includes('Variant Price'), 'pricePack must not use CSV 
 assert.ok(!pricePackBody.includes('Variant Compare At Price'), 'pricePack must not use CSV compare-at price');
 
 has(/image:\s*isVariant\s*\?\s*''/, 'parent rows with options must have no product image');
+has(/sku:\s*isVariant\s*\?\s*''\s*:\s*cleanSku\(first\['Variant SKU'\]\)/, 'parent rows with options must not repeat an SKU');
 has(/optName:\s*isVariant\s*\?\s*'الحجم'/, 'variant parent rows must define [1] الاسم as الحجم');
 has(/optType:\s*isVariant\s*\?\s*'صورة'/, 'variant parent rows must define [1] النوع as صورة');
 has(/largeImageUrl\([^)]*Image Src/, 'option/product images must pass through largeImageUrl');
@@ -109,5 +120,9 @@ notHas(/أول\s*\$\{Math\.min\(visibleRows\.length,400\)/, 'preview note must n
 
 const templateBody = html.match(/function\s+templateRowArray\s*\([^)]*\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
 assert.ok(!/translationStatus|translationReason|translationLabel|translationAction/.test(templateBody), 'translation preview columns must not be exported in templateRowArray');
+assert.ok(/row\.cost\s*,\s*row\.sale\s*,\s*''\s*,\s*''\s*,\s*10000\s*,/.test(templateBody), 'templateRowArray must export 10000 for max quantity per customer');
 has(/function\s+previewExtraCells/, 'translation status/reasons must be rendered as preview-only cells');
 notHas(/templateFileObj/, 'template upload state must stay removed');
+
+const selectedRowsBody = html.match(/function\s+selectedRows\s*\(\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
+assert.ok(selectedRowsBody.includes('isBrandFileSelected'), 'selectedRows must include rows matched by the optional brand file');
