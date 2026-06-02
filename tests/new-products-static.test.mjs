@@ -60,6 +60,7 @@ has(/function\s+showStep/, 'page must expose a step switching function');
 has(/function\s+goToTranslationStep/, 'page must expose a next-step handler');
 has(/function\s+goToPreviewStep/, 'page must expose a back-step handler');
 has(/id="translationProvider"/, 'translation settings must include a provider selector');
+has(/id="translationModel"/, 'translation settings must include a model selector');
 has(/id="translationApiKey"/, 'translation settings must include an API key input');
 has(/id="translationMinLength"/, 'translation settings must include an editable minimum description length');
 has(/id="translateDescriptionsBtn"/, 'translation panel must include a translate/review action');
@@ -73,7 +74,8 @@ has(/stTranslationSkipped/, 'translation stats must report skipped descriptions'
 has(/stTranslationPending/, 'translation stats must report pending descriptions');
 has(/stTranslationReady/, 'translation stats must report descriptions ready to translate');
 has(/https:\/\/api\.deepseek\.com\/chat\/completions/, 'DeepSeek direct endpoint must be configured');
-has(/deepseek-v4-pro/, 'DeepSeek direct model must use deepseek-v4-pro');
+has(/deepseek-v4-flash/, 'DeepSeek direct model selector must include the fast V4 Flash model');
+has(/deepseek-v4-pro/, 'DeepSeek direct model selector must keep DeepSeek V4 Pro available');
 has(/https:\/\/openrouter\.ai\/api\/v1\/chat\/completions/, 'OpenRouter endpoint must be configured');
 has(/deepseek\/deepseek-v4-pro/, 'OpenRouter model must use DeepSeek V4 Pro');
 has(/function\s+isTranslatableDescription/, 'page must decide whether a source description is worth translating');
@@ -84,6 +86,8 @@ has(/function\s+retryFailedTranslations/, 'page must retry only failed translati
 has(/function\s+pauseTranslations/, 'page must pause an active translation batch');
 has(/function\s+resumeTranslations/, 'page must resume a paused translation batch');
 has(/function\s+translationMinLength/, 'page must read the editable description length threshold');
+has(/function\s+syncTranslationModelOptions/, 'page must sync model choices with the selected provider');
+has(/function\s+translationModelName/, 'page must send the selected model to the API');
 has(/function\s+refreshTranslationEligibility/, 'page must refresh eligibility when the threshold changes');
 has(/function\s+excludeTranslation/, 'page must let users exclude filtered descriptions from translation');
 has(/function\s+restoreExcludedTranslation/, 'page must let users restore manually excluded descriptions');
