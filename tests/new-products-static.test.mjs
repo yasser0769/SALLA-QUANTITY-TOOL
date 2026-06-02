@@ -61,8 +61,11 @@ has(/function\s+goToTranslationStep/, 'page must expose a next-step handler');
 has(/function\s+goToPreviewStep/, 'page must expose a back-step handler');
 has(/id="translationProvider"/, 'translation settings must include a provider selector');
 has(/id="translationApiKey"/, 'translation settings must include an API key input');
+has(/id="translationMinLength"/, 'translation settings must include an editable minimum description length');
 has(/id="translateDescriptionsBtn"/, 'translation panel must include a translate/review action');
 has(/id="retryFailedTranslationsBtn"/, 'translation panel must include a retry-failed action');
+has(/id="pauseTranslationsBtn"/, 'translation panel must include a pause action');
+has(/id="resumeTranslationsBtn"/, 'translation panel must include a resume action');
 has(/id="translationStatusFilter"/, 'preview must include a translation status filter');
 has(/stTranslationOk/, 'translation stats must report successful descriptions');
 has(/stTranslationFailed/, 'translation stats must report failed descriptions');
@@ -77,6 +80,18 @@ has(/function\s+translateDescriptions/, 'page must translate selected product de
 has(/function\s+reviewTranslations/, 'page must review translated descriptions');
 has(/function\s+validateTranslatedDescription/, 'page must locally validate reviewed translations');
 has(/function\s+retryFailedTranslations/, 'page must retry only failed translations');
+has(/function\s+pauseTranslations/, 'page must pause an active translation batch');
+has(/function\s+resumeTranslations/, 'page must resume a paused translation batch');
+has(/function\s+translationMinLength/, 'page must read the editable description length threshold');
+has(/function\s+refreshTranslationEligibility/, 'page must refresh eligibility when the threshold changes');
+has(/function\s+excludeTranslation/, 'page must let users exclude filtered descriptions from translation');
+has(/function\s+restoreExcludedTranslation/, 'page must let users restore manually excluded descriptions');
+has(/skipped_manual/, 'manual translation exclusions must be represented as skipped state');
+has(/let\s+[^;]*translationPaused\s*=\s*false/, 'translation state must track pause/resume status');
+has(/translationQueue/, 'translation state must keep a resumable queue');
+has(/id="translationMinLength"[^>]*value="70"/, 'default translation threshold must be 70 characters');
+has(/plain\.length\s*<=\s*minLength/, 'descriptions at or below the editable threshold must be skipped');
+notHas(/plain\.length\s*<\s*35/, 'old 35-character translation threshold must be removed');
 has(/response_format\s*:\s*\{\s*type\s*:\s*['"]json_object['"]\s*\}/, 'LLM calls must request JSON object responses');
 has(/includes\(['"]\*['"]\)/, 'translation validator must reject asterisks');
 has(/\\u4E00-\\u9FFF|Script=Han/, 'translation validator must reject Chinese characters');
@@ -85,6 +100,6 @@ notHas(/slice\(\s*0\s*,\s*400\s*\)/, 'preview must not hard-cap visible rows to 
 notHas(/أول\s*\$\{Math\.min\(visibleRows\.length,400\)/, 'preview note must not mention the first 400 rows');
 
 const templateBody = html.match(/function\s+templateRowArray\s*\([^)]*\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
-assert.ok(!/translationStatus|translationReason|translationLabel/.test(templateBody), 'translation preview columns must not be exported in templateRowArray');
+assert.ok(!/translationStatus|translationReason|translationLabel|translationAction/.test(templateBody), 'translation preview columns must not be exported in templateRowArray');
 has(/function\s+previewExtraCells/, 'translation status/reasons must be rendered as preview-only cells');
 notHas(/templateFileObj/, 'template upload state must stay removed');

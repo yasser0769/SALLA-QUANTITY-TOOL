@@ -58,7 +58,7 @@ h1{font-size:clamp(1.55rem,3vw,2.1rem);font-weight:700;margin-bottom:8px}
 .panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
 .panel h2{font-size:1.05rem}
 .search{width:min(360px,100%);padding:10px 12px;background:#0f1117;border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;outline:none}
-.translation-grid{display:grid;grid-template-columns:minmax(170px,1fr) minmax(230px,2fr) auto auto;gap:10px;align-items:end;margin-bottom:12px}
+.translation-grid{display:grid;grid-template-columns:minmax(150px,1fr) minmax(140px,.8fr) minmax(230px,2fr) repeat(4,auto);gap:10px;align-items:end;margin-bottom:12px}
 .step-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;margin-bottom:0}
 .field label{display:block;font-size:.7rem;color:var(--text2);margin-bottom:5px;font-weight:700}
 .field input,.field select{width:100%;padding:10px 12px;background:#0f1117;border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;outline:none;min-height:42px}
@@ -93,6 +93,7 @@ tr:hover td{background:rgba(20,184,166,.035)}
 .pill.translation.skipped{background:var(--amber-dim);color:var(--amber)}
 .pill.translation.pending{background:rgba(167,139,250,.14);color:#c4b5fd}
 .pill.translation.untranslated{background:rgba(112,120,135,.16);color:var(--text2)}
+.btn.small{padding:6px 9px;font-size:.7rem;border-radius:6px}
 .empty{text-align:center;padding:36px;color:var(--text3);font-size:.85rem}
 </style>
 </head>
@@ -169,11 +170,17 @@ tr:hover td{background:rgba(20,184,166,.035)}
         </select>
       </div>
       <div class="field">
+        <label for="translationMinLength">ترجم إذا الوصف أكبر من</label>
+        <input id="translationMinLength" type="number" min="0" step="1" value="70" oninput="refreshTranslationEligibility()">
+      </div>
+      <div class="field">
         <label for="translationApiKey">API Key</label>
         <input id="translationApiKey" type="password" autocomplete="off" placeholder="sk-...">
       </div>
       <button class="btn primary" id="translateDescriptionsBtn" onclick="translateDescriptions()">ترجمة ومراجعة الأوصاف</button>
       <button class="btn" id="retryFailedTranslationsBtn" onclick="retryFailedTranslations()">إعادة ترجمة الفاشل</button>
+      <button class="btn" id="pauseTranslationsBtn" disabled onclick="pauseTranslations()">إيقاف مؤقت</button>
+      <button class="btn" id="resumeTranslationsBtn" disabled onclick="resumeTranslations()">استئناف</button>
     </div>
     <div class="translation-stats">
       <div class="stat"><div class="n" id="stTranslationOk" style="color:var(--green)">0</div><div class="l">ناجح</div></div>
@@ -247,6 +254,8 @@ let csvBySku=new Map(), priceBySku=new Map();
 let brandExactMap=new Map(), brandArabicMap=new Map(), newBrands=new Set(), selectedBrands=new Set();
 let rowCache=[];
 let currentStep='preview', translationStates=new Map(), previewRenderToken=0;
+let translationPaused=false, translationRunning=false;
+let translationQueue=[], translationQueueIndex=0, translationQueueFilter='all';
 const TEMPLATE_URL='assets/salla-products-template.xlsx';
 const TRANSLATION_PROVIDERS={
   deepseek:{endpoint:'https://api.deepseek.com/chat/completions',model:'deepseek-v4-pro'},
@@ -598,12 +607,17 @@ function htmlToPlainText(value){
 function comparableText(value){
   return htmlToPlainText(value).toLowerCase().replace(/[^\p{Script=Arabic}\p{Script=Latin}\p{Number}\s]+/gu,'').replace(/\s+/g,' ').trim();
 }
-function isTranslatableDescription(description, productTitle){
+function translationMinLength(){
+  const input=document.getElementById('translationMinLength');
+  const value=Number(input?.value);
+  return Number.isFinite(value)&&value>=0?Math.floor(value):70;
+}
+function isTranslatableDescription(description, productTitle, minLength=translationMinLength()){
   const plain=htmlToPlainText(description);
   if(!plain)return{ok:false,status:'skipped_empty',reason:'الوصف فارغ'};
   const normalized=comparableText(plain);
   const title=comparableText(productTitle);
-  if(plain.length<35)return{ok:false,status:'skipped_name_only',reason:'الوصف قصير جدا أو اسم فقط'};
+  if(plain.length<=minLength)return{ok:false,status:'skipped_name_only',reason:`الوصف ${plain.length.toLocaleString()} حرف، لا يتجاوز حد الترجمة (${minLength.toLocaleString()})`};
   if(title&&(normalized===title||((title.includes(normalized)||normalized.includes(title))&&plain.length<title.length+35))){
     return{ok:false,status:'skipped_name_only',reason:'الوصف مطابق لاسم المنتج تقريبا'};
   }
@@ -634,18 +648,28 @@ function prepareTranslationStates(){
   const groups=groupsByHandle(filterRowsWithImages(selectedRows()));
   for(const group of groups){
     const first=group[0], key=translationKeyForRow(first), title=productName(group);
-    if(translationStates.has(key))continue;
     const source=first['Body (HTML)']||'';
+    const existing=translationStates.get(key);
+    if(existing&&['ok','failed','pending','skipped_manual'].includes(existing.status)){
+      translationStates.set(key,{...existing,source,title});
+      continue;
+    }
     const eligibility=isTranslatableDescription(source,title);
     translationStates.set(key,{
       status:eligibility.ok?'untranslated':eligibility.status,
-      reason:eligibility.reason,
+      reason:eligibility.ok?'لم تتم الترجمة بعد':eligibility.reason,
       source,
       title,
-      cleaned:''
+      cleaned:existing?.cleaned||''
     });
   }
   updateTranslationStats();
+}
+function refreshTranslationEligibility(){
+  if(translationRunning){logMsg('أوقف أو انتظر انتهاء دفعة الترجمة قبل تغيير حد الحروف');return;}
+  prepareTranslationStates();
+  updateTranslationStats();
+  updatePreview();
 }
 function updateTranslationStats(){
   const counts={ok:0,failed:0,skipped:0,pending:0};
@@ -738,27 +762,71 @@ async function translateDescriptionGroup(group){
     translationStates.set(key,{status:'failed',reason:error.message,source:first['Body (HTML)']||'',title,cleaned:''});
   }
 }
-async function translateDescriptions(filter='all'){
-  prepareTranslationStates();
-  const groups=groupsByHandle(filterRowsWithImages(selectedRows())).filter(group=>{
+function setTranslationControls(){
+  const running=translationRunning;
+  document.getElementById('translateDescriptionsBtn').disabled=running;
+  document.getElementById('retryFailedTranslationsBtn').disabled=running;
+  document.getElementById('pauseTranslationsBtn').disabled=!running||translationPaused;
+  document.getElementById('resumeTranslationsBtn').disabled=!running||!translationPaused;
+  document.getElementById('translationProvider').disabled=running;
+  document.getElementById('translationApiKey').disabled=running;
+  document.getElementById('translationMinLength').disabled=running;
+}
+function translationGroupsForRun(filter){
+  return groupsByHandle(filterRowsWithImages(selectedRows())).filter(group=>{
     const state=translationStateForKey(translationKeyForRow(group[0]));
     if(filter==='failed')return state.status==='failed';
     return translationFilterValue(state)==='untranslated';
   });
-  if(!groups.length){logMsg(filter==='failed'?'لا توجد ترجمات فاشلة لإعادتها':'لا توجد أوصاف جديدة قابلة للترجمة');return;}
-  document.getElementById('translateDescriptionsBtn').disabled=true;
-  document.getElementById('retryFailedTranslationsBtn').disabled=true;
-  for(let i=0;i<groups.length;i++){
-    setProgress(Math.round((i/groups.length)*90)+5);
-    await translateDescriptionGroup(groups[i]);
+}
+async function runTranslationQueue(){
+  const total=translationQueue.length;
+  while(translationQueueIndex<total){
+    if(translationPaused){
+      setTranslationControls();
+      logMsg(`تم إيقاف الترجمة مؤقتا عند ${translationQueueIndex.toLocaleString()} من ${total.toLocaleString()}`);
+      return;
+    }
+    setProgress(Math.round((translationQueueIndex/total)*90)+5);
+    await translateDescriptionGroup(translationQueue[translationQueueIndex]);
+    translationQueueIndex++;
     updateTranslationStats();updatePreview();
   }
-  document.getElementById('translateDescriptionsBtn').disabled=false;
-  document.getElementById('retryFailedTranslationsBtn').disabled=false;
+  translationRunning=false;
+  translationPaused=false;
+  const finished=translationQueue.length;
+  translationQueue=[];
+  translationQueueIndex=0;
+  setTranslationControls();
   setProgress(100);hideProgress();
-  logMsg(`انتهت ترجمة ومراجعة ${groups.length.toLocaleString()} وصف`);
+  logMsg(`انتهت ترجمة ومراجعة ${finished.toLocaleString()} وصف`);
+}
+async function translateDescriptions(filter='all'){
+  if(translationRunning){logMsg('هناك دفعة ترجمة قيد التنفيذ');return;}
+  prepareTranslationStates();
+  translationQueue=translationGroupsForRun(filter);
+  translationQueueIndex=0;
+  translationQueueFilter=filter;
+  if(!translationQueue.length){logMsg(filter==='failed'?'لا توجد ترجمات فاشلة لإعادتها':'لا توجد أوصاف جديدة قابلة للترجمة');return;}
+  translationPaused=false;
+  translationRunning=true;
+  setTranslationControls();
+  await runTranslationQueue();
 }
 async function retryFailedTranslations(){await translateDescriptions('failed');}
+function pauseTranslations(){
+  if(!translationRunning)return;
+  translationPaused=true;
+  setTranslationControls();
+  logMsg('سيتم إيقاف الترجمة بعد انتهاء الطلب الحالي');
+}
+async function resumeTranslations(){
+  if(!translationRunning||!translationPaused)return;
+  translationPaused=false;
+  setTranslationControls();
+  logMsg(`تم استئناف الترجمة (${translationQueueFilter==='failed'?'الفاشل فقط':'كل غير المترجم'})`);
+  await runTranslationQueue();
+}
 function typeText(row){
   const xls=row._xls||row;
   return cleanText(xls['Size/Type']);
@@ -961,18 +1029,48 @@ function resetPreviewFilters(){
   updatePreview();
 }
 function previewHeadersForStep(){
-  return currentStep==='translation'?previewHeaders.concat(['حالة الترجمة','سبب حالة الترجمة']):previewHeaders;
+  return currentStep==='translation'?previewHeaders.concat(['حالة الترجمة','سبب حالة الترجمة','إجراء الترجمة']):previewHeaders;
 }
 function ensurePreviewHeaders(){
   const headRow=document.querySelector('#previewPanel thead tr');
   headRow.innerHTML='<th>#</th>';
   previewHeadersForStep().forEach(header=>headRow.insertAdjacentHTML('beforeend',`<th>${escapeHtml(header)}</th>`));
 }
+function encodedTranslationKey(key){return encodeURIComponent(String(key??''));}
+function excludeTranslation(encodedKey){
+  if(translationRunning){logMsg('أوقف دفعة الترجمة قبل تعديل الاستبعادات اليدوية');return;}
+  const key=decodeURIComponent(encodedKey);
+  const state=translationStateForKey(key);
+  translationStates.set(key,{...state,status:'skipped_manual',reason:'استبعاد يدوي من الترجمة',cleaned:''});
+  updateTranslationStats();updatePreview();
+}
+function restoreExcludedTranslation(encodedKey){
+  if(translationRunning){logMsg('أوقف دفعة الترجمة قبل تعديل الاستبعادات اليدوية');return;}
+  const key=decodeURIComponent(encodedKey);
+  const state=translationStateForKey(key);
+  const eligibility=isTranslatableDescription(state.source||'',state.title||'');
+  translationStates.set(key,{
+    ...state,
+    status:eligibility.ok?'untranslated':eligibility.status,
+    reason:eligibility.ok?'لم تتم الترجمة بعد':eligibility.reason,
+    cleaned:''
+  });
+  updateTranslationStats();updatePreview();
+}
+function translationActionCell(row){
+  if(row.type!=='منتج'||!row.translationKey)return'';
+  const key=encodedTranslationKey(row.translationKey);
+  const state=translationStateForKey(row.translationKey);
+  if(state.status==='pending')return'';
+  if(state.status==='skipped_manual')return`<button class="btn small" onclick="restoreExcludedTranslation('${key}')">إرجاع</button>`;
+  if(state.status==='skipped_empty'||state.status==='skipped_name_only')return'';
+  return`<button class="btn small" onclick="excludeTranslation('${key}')">استبعاد</button>`;
+}
 function previewExtraCells(row){
   if(currentStep!=='translation')return[];
   const status=row.translationStatus||'untranslated';
   const label=translationStatusLabel({status});
-  return [`<span class="pill translation ${escapeHtml(status)}">${escapeHtml(label)}</span>`,row.translationReason||''];
+  return [`<span class="pill translation ${escapeHtml(status)}">${escapeHtml(label)}</span>`,row.translationReason||'',translationActionCell(row)];
 }
 function renderPreviewRowsBatch(rows, body, token, start=0){
   if(token!==previewRenderToken)return;
@@ -982,7 +1080,7 @@ function renderPreviewRowsBatch(rows, body, token, start=0){
   for(let i=start;i<end;i++){
     const row=rows[i];
     const baseCells=templateRowArray(row).map(value=>`<td>${escapeHtml(value)}</td>`).join('');
-    const extraCells=previewExtraCells(row).map((value,idx)=>idx===0?`<td>${value}</td>`:`<td>${escapeHtml(value)}</td>`).join('');
+    const extraCells=previewExtraCells(row).map((value,idx)=>(idx===0||idx===2)?`<td>${value}</td>`:`<td>${escapeHtml(value)}</td>`).join('');
     const cells=baseCells+extraCells;
     html+=`<tr><td>${i+1}</td>${cells}</tr>`;
   }
