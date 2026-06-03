@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>إصلاح خيارات منتجات سلة</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<style>
+:root{
+  --bg:#f6f8fb;--surface:#ffffff;--surface2:#f8fafc;--surface3:#eef2f7;
+  --border:#dbe3ed;--border2:#c7d2df;--text:#111827;--text2:#4b5563;--text3:#7b8494;
+  --accent:#0d9488;--accent-dim:rgba(13,148,136,.1);--green:#16a34a;--red:#e11d48;--amber:#d97706;
+  --green-dim:rgba(22,163,74,.11);--red-dim:rgba(225,29,72,.1);--amber-dim:rgba(217,119,6,.12);
+  --shadow:0 16px 36px rgba(15,23,42,.08);--radius:10px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{background:var(--bg)}
+body{font-family:'IBM Plex Sans Arabic',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:linear-gradient(180deg,#ffffff 0,#f6f8fb 280px);color:var(--text);min-height:100vh;line-height:1.65}
+.grain{position:fixed;inset:0;pointer-events:none;opacity:.012;z-index:9999;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.app{max-width:1200px;margin:0 auto;padding:38px 20px 80px;position:relative;z-index:1}
+.hdr{text-align:center;margin-bottom:30px;border-bottom:1px solid var(--border);padding-bottom:26px}
+.badge{display:inline-flex;align-items:center;padding:5px 12px;border:1px solid rgba(13,148,136,.22);border-radius:999px;font-size:.68rem;font-weight:700;background:var(--accent-dim);color:#0f766e;margin-bottom:13px}
+h1{font-size:clamp(1.55rem,3vw,2.1rem);font-weight:700;margin-bottom:8px}
+.hdr p{color:var(--text2);font-size:.92rem;font-weight:400;max-width:780px;margin:0 auto}
+.top-links{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin-top:12px}
+.top-links a{color:var(--accent);font-size:.82rem;font-weight:700;text-decoration:none}
+.note,.panel{background:linear-gradient(180deg,#ffffff,#f8fafc);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+.note{border-inline-start:3px solid var(--accent);padding:17px 20px;margin-bottom:20px;font-size:.82rem;color:var(--text2);line-height:1.95}
+.note strong{color:var(--text)}
+.uploads{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
+@media(max-width:760px){.uploads{grid-template-columns:1fr}}
+.upload-zone{background:linear-gradient(180deg,var(--surface2),var(--surface));border:1px dashed var(--border2);border-radius:var(--radius);padding:24px 18px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s,transform .2s,box-shadow .2s;min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.upload-zone:hover{border-color:var(--accent);background:#f0fdfa;transform:translateY(-2px);box-shadow:var(--shadow)}
+.upload-zone.ok{border-style:solid;border-color:rgba(34,197,94,.65);background:linear-gradient(180deg,rgba(34,197,94,.08),var(--surface))}
+.upload-zone input{display:none}
+.upload-zone .ico{font-size:1.55rem;font-weight:800;color:var(--accent);margin-bottom:8px}
+.upload-zone h3{font-size:.95rem;font-weight:700;margin-bottom:3px}
+.upload-zone .sub{font-size:.74rem;color:var(--text2)}
+.file-info{font-size:.76rem;color:var(--green);margin-top:10px;font-weight:600;word-break:break-word}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}
+.btn{padding:11px 17px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit;font-size:.86rem;font-weight:700;cursor:pointer;transition:all .2s}
+.btn:hover:not(:disabled){border-color:var(--accent);background:var(--surface2);transform:translateY(-1px)}
+.btn.primary{background:linear-gradient(135deg,#0d9488,#0f766e);border-color:transparent;color:#fff;box-shadow:0 14px 30px rgba(13,148,136,.18)}
+.btn:disabled{opacity:.38;cursor:not-allowed;box-shadow:none}
+.progress{height:4px;background:var(--surface2);border-radius:4px;margin-bottom:20px;overflow:hidden;display:none}
+.progress .bar{height:100%;background:linear-gradient(90deg,var(--accent),#a78bfa,var(--amber));width:0;transition:width .3s}
+.log{background:#f8fafc;border:1px solid var(--border);border-radius:var(--radius);padding:13px 16px;margin-bottom:20px;font-size:.75rem;color:var(--text2);max-height:126px;overflow-y:auto;display:none;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.stats{display:none;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;margin-bottom:20px}
+.stat{background:linear-gradient(180deg,#ffffff,var(--surface2));border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center}
+.stat .n{font-size:1.42rem;font-weight:700;margin-bottom:1px}
+.stat .l{font-size:.7rem;color:var(--text2)}
+.tabs{display:none;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.tab{padding:9px 14px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text2);font-family:inherit;font-size:.8rem;font-weight:700;cursor:pointer}
+.tab.on{background:var(--accent-dim);border-color:rgba(13,148,136,.32);color:#0f766e}
+.panel{display:none;padding:16px;margin-bottom:20px}
+.panel.on{display:block}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.panel h2{font-size:1.05rem}
+.search{width:min(360px,100%);padding:10px 12px;background:#ffffff;border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;outline:none}
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:auto;max-height:62vh;box-shadow:var(--shadow)}
+table{width:100%;border-collapse:collapse;font-size:.76rem;min-width:1500px}
+thead{position:sticky;top:0;z-index:2}
+th{background:#f1f5f9;padding:12px 9px;font-weight:700;text-align:right;color:var(--text2);font-size:.71rem;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:10px 9px;border-bottom:1px solid rgba(219,227,237,.78);white-space:nowrap}
+tr:hover td{background:rgba(13,148,136,.055)}
+.muted{color:var(--text3)}
+.pill{display:inline-block;padding:2px 8px;border-radius:5px;font-size:.68rem;font-weight:700}
+.pill.ok{background:var(--green-dim);color:var(--green)}
+.pill.warn{background:var(--amber-dim);color:var(--amber)}
+.pill.bad{background:var(--red-dim);color:var(--red)}
+.empty{text-align:center;padding:36px;color:var(--text3);font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<main class="app">
+  <header class="hdr">
+    <div class="badge">SALLA OPTIONS FIX TOOL</div>
+    <h1>إصلاح خيارات منتجات سلة</h1>
+    <p>ارفع ملف منتجات سلة الكامل + ملف المورد CSV + ملف AllFragrances، ثم راجع الحالتين وقيم الخيارات العربية قبل التصدير.</p>
+    <div class="top-links">
+      <a href="index.html">الرجوع لتحديث الأسعار والكميات</a>
+      <a href="new-products.html">صفحة المنتجات الجديدة</a>
+      <a href="translate-descriptions.html">ترجمة أوصاف سلة</a>
+    </div>
+  </header>
+
+  <div class="note">
+    <strong>الحالة الأولى:</strong> إذا كان المنتج الأب موجودًا في سلة وبعض خياراته تحته، لكن خيارًا من نفس <span dir="ltr">Handle</span> موجود كمنتج عادي، يتم تصديره كخيار تحت الأب.<br>
+    <strong>الحالة الثانية:</strong> إذا كانت كل منتجات نفس <span dir="ltr">Handle</span> منتجات عادية ولا يوجد أب حالي، تظهر للمعاينة اليدوية فقط ولا تدخل ملف التصدير.<br>
+    <strong>قيمة الخيار:</strong> تؤخذ من <span dir="ltr">AllFragrances Size/Type</span> وتتحول للعربية مثل <span dir="ltr">100 ملل</span>، ويستخدم الشريط الترويجي من سلة كاحتياط فقط.<br>
+    <strong>التصدير:</strong> الملف الناتج يستخدم ملف سلة المرفوع كقالب ويحافظ على ترتيب الأعمدة وعمود ID إذا كان موجودًا.
+  </div>
+
+  <div class="uploads">
+    <div class="upload-zone" onclick="this.querySelector('input').click()" id="sallaZone">
+      <input type="file" id="sallaFile" accept=".xlsx,.xls" onchange="loadSallaProducts(event)">
+      <div class="ico">XLSX</div>
+      <h3>ملف منتجات سلة الكامل</h3>
+      <div class="sub">تصدير المنتجات الكامل من سلة</div>
+      <div class="file-info" id="sallaInfo"></div>
+    </div>
+    <div class="upload-zone" onclick="this.querySelector('input').click()" id="supplierZone">
+      <input type="file" id="supplierFile" accept=".csv" onchange="loadSupplierCsv(event)">
+      <div class="ico">CSV</div>
+      <h3>ملف المورد CSV</h3>
+      <div class="sub">يحتوي Handle و Variant SKU</div>
+      <div class="file-info" id="supplierInfo"></div>
+    </div>
+    <div class="upload-zone" onclick="this.querySelector('input').click()" id="priceListZone">
+      <input type="file" id="priceListFile" accept=".xls,.xlsx" onchange="loadPriceListXls(event)">
+      <div class="ico">XLS</div>
+      <h3>ملف AllFragrances</h3>
+      <div class="sub">مصدر Size/Type لقيمة الخيار العربية</div>
+      <div class="file-info" id="priceListInfo"></div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="analyzeBtn" disabled onclick="analyzeOptions()">تحليل مشاكل الخيارات</button>
+    <button class="btn primary" id="downloadBtn" disabled onclick="downloadOptionsFixXlsx()">تحميل ملف الإصلاح</button>
+  </div>
+  <div class="progress" id="progress"><div class="bar" id="bar"></div></div>
+  <div class="log" id="logBox"></div>
+
+  <div class="stats" id="stats">
+    <div class="stat"><div class="n" id="stHandles">0</div><div class="l">Handle متعدد الخيارات</div></div>
+    <div class="stat"><div class="n" id="stAuto" style="color:var(--green)">0</div><div class="l">الحالة الأولى</div></div>
+    <div class="stat"><div class="n" id="stManual" style="color:var(--amber)">0</div><div class="l">الحالة الثانية</div></div>
+    <div class="stat"><div class="n" id="stWarnings" style="color:var(--red)">0</div><div class="l">تحذيرات</div></div>
+    <div class="stat"><div class="n" id="stExportRows" style="color:var(--accent)">0</div><div class="l">صفوف ملف الإصلاح</div></div>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button class="tab on" onclick="showPanel('autoFixPanel',this)">معاينة الحالة الأولى</button>
+    <button class="tab" onclick="showPanel('manualOnlyPanel',this)">معاينة الحالة الثانية</button>
+    <button class="tab" onclick="showPanel('warningsPanel',this)">معاينة التحذيرات</button>
+  </div>
+
+  <section class="panel on" id="autoFixPanel">
+    <div class="panel-head">
+      <h2>الحالة الأولى: جاهزة للإصلاح والتصدير</h2>
+      <div class="actions" style="margin:0">
+        <input class="search" id="autoSearch" placeholder="بحث في الحالة الأولى..." oninput="renderAutoFixPreview()">
+        <button class="btn primary" id="downloadAutoFixPreviewBtn" disabled onclick="downloadAutoFixPreviewXlsx()">تحميل معاينة الحالة الأولى</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>#</th><th>Handle</th><th>اسم الأب</th><th>ID الأب</th><th>خيارات موجودة تحت الأب</th>
+          <th>المنتج العادي الذي سيتحول</th><th>ID المنتج العادي</th><th>SKU</th><th>قيمة الخيار</th><th>مصدر القيمة</th><th>الحالة</th>
+        </tr></thead>
+        <tbody id="autoFixBody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="autoFixEmpty" style="display:none">لا توجد حالات قابلة للتصدير</div>
+  </section>
+
+  <section class="panel" id="manualOnlyPanel">
+    <div class="panel-head">
+      <h2>الحالة الثانية: تحتاج حل يدوي</h2>
+      <input class="search" id="manualSearch" placeholder="بحث في الحالة الثانية..." oninput="renderManualOnlyPreview()">
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>#</th><th>Handle</th><th>عدد المنتجات العادية</th><th>الأسماء</th><th>IDs</th>
+          <th>SKUs</th><th>القيم/الأحجام المتوقعة</th><th>مصادر القيم</th><th>سبب الاستبعاد</th>
+        </tr></thead>
+        <tbody id="manualOnlyBody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="manualOnlyEmpty" style="display:none">لا توجد حالات يدوية</div>
+  </section>
+
+  <section class="panel" id="warningsPanel">
+    <div class="panel-head">
+      <h2>التحذيرات والحالات غير الواضحة</h2>
+      <input class="search" id="warningSearch" placeholder="بحث في التحذيرات..." oninput="renderWarningsPreview()">
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>#</th><th>Handle</th><th>السبب</th><th>SKUs المورد</th><th>SKUs موجودة في سلة</th><th>SKUs ناقصة</th>
+        </tr></thead>
+        <tbody id="warningsBody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="warningsEmpty" style="display:none">لا توجد تحذيرات</div>
+  </section>
+</main>
+
+<script>
+let sallaFile=null, supplierFile=null, priceListFile=null, sallaBuffer=null, sallaWorkbook=null, sallaWorksheet=null;
+let headerMap={}, headerList=[], sallaRows=[], products=[], rowsBySku=new Map();
+let supplierGroups=new Map(), priceRows=[], priceBySku=new Map(), autoFixCases=[], manualOnlyCases=[], warningCases=[];
+const HEADER_ALIASES={
+  type:['النوع','النوع '],
+  name:['أسم المنتج','اسم المنتج'],
+  sku:['رمز المنتج sku','رمز المنتج SKU','sku','SKU'],
+  category:['تصنيف المنتج'],
+  productImage:['صورة المنتج'],
+  imageAlt:['وصف صورة المنتج'],
+  readyType:['نوع المنتج'],
+  description:['الوصف'],
+  shipping:['هل يتطلب شحن؟'],
+  brand:['الماركة'],
+  promo:['العنوان الترويجي'],
+  pinned:['تثبيت المنتج'],
+  addImage:['اضافة صورة عند الطلب'],
+  weight:['الوزن'],
+  unit:['وحدة الوزن'],
+  taxable:['خاضع للضريبة ؟'],
+  taxReason:['سبب عدم الخضوع للضريبة'],
+  option1Name:['[1] الاسم'],
+  option1Type:['[1] النوع'],
+  option1Value:['[1] القيمة'],
+  option1Image:['[1] الصورة / اللون']
+};
+const ID_HEADERS=['id','ID','Id','معرف المنتج','رقم المنتج','Product ID','Product Id','product_id','ProductID'];
+
+function readArrayBuffer(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=event=>resolve(event.target.result);
+    reader.onerror=reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+function setProgress(pct){document.getElementById('progress').style.display='block';document.getElementById('bar').style.width=pct+'%';}
+function hideProgress(){setTimeout(()=>{document.getElementById('progress').style.display='none';},350)}
+function logMsg(msg){const box=document.getElementById('logBox');box.style.display='block';box.innerHTML+=msg+'<br>';box.scrollTop=box.scrollHeight;}
+function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+function cleanText(value){return String(value??'').replace(/\s+/g,' ').trim();}
+function cleanSku(value){
+  const text=cleanText(value);
+  if(/^\d+(?:\.0+)?$/.test(text))return text.replace(/\.0+$/,'');
+  return text.replace(/[^\dA-Za-z_-]/g,'');
+}
+function round2(value){return Math.round(value*100)/100;}
+function formatNumber(value){
+  return Number.isInteger(value)?String(value):String(round2(value)).replace(/\.?0+$/,'');
+}
+function uniqueValues(values){return [...new Set(values.map(cleanText).filter(Boolean))];}
+function cellValue(cell){return cell?.value?.text ?? cell?.value?.result ?? cell?.value ?? '';}
+function cellText(cell){return cleanText(cellValue(cell));}
+function largeImageUrl(url){
+  return String(url??'').trim().replace(/\/images\/products\/sku\/small\//i,'/images/products/SKU/large/');
+}
+function checkReady(){document.getElementById('analyzeBtn').disabled=!(sallaFile&&supplierFile&&priceListFile);}
+function headerCol(key){
+  for(const alias of HEADER_ALIASES[key]||[]){
+    if(headerMap[alias])return headerMap[alias];
+  }
+  return 0;
+}
+function findIdCol(){
+  for(const header of ID_HEADERS){
+    if(headerMap[header])return headerMap[header];
+  }
+  for(const [header,col] of Object.entries(headerMap)){
+    const normalized=header.toLowerCase();
+    if(normalized==='id'||normalized==='product id'||normalized==='product_id')return col;
+    if(header.includes('معرف')&&header.includes('منتج'))return col;
+  }
+  return 0;
+}
+function valueFor(record,key){
+  const col=headerCol(key);
+  return col?record.values[col-1]:'';
+}
+function textFor(record,key){return cleanText(valueFor(record,key));}
+function skuFor(record){return cleanSku(valueFor(record,'sku'));}
+function idFor(record){
+  const col=findIdCol();
+  return col?cleanText(record.values[col-1]):'';
+}
+function typeText(row){
+  return cleanText(row?.['Size/Type']);
+}
+function sizeMl(row){
+  const text=typeText(row);
+  const ml=text.match(/(\d+(?:\.\d+)?)\s*ml/i);
+  if(ml)return `${formatNumber(parseFloat(ml[1]))} ملل`;
+  const oz=text.match(/(\d+(?:\.\d+)?)\s*oz/i);
+  if(!oz)return '';
+  const converted=parseFloat(oz[1])*29.5735295625;
+  const common=[1,2,3,5,7.5,10,15,30,40,50,60,75,80,90,100,120,125,150,200,240,250,300,500];
+  const nearest=common.reduce((best,item)=>Math.abs(item-converted)<Math.abs(best-converted)?item:best,common[0]);
+  const value=Math.abs(nearest-converted)<=3?nearest:Math.round(converted);
+  return `${formatNumber(value)} ملل`;
+}
+function optionValueInfo(record){
+  const xlsRow=priceBySku.get(record.sku);
+  const allFragrancesValue=sizeMl(xlsRow);
+  if(allFragrancesValue)return{value:allFragrancesValue,source:'AllFragrances'};
+  const promo=textFor(record,'promo');
+  if(promo)return{value:promo,source:'شريط سلة'};
+  return{value:'',source:'غير معروف'};
+}
+function setByHeader(values,key,value){
+  const col=headerCol(key);
+  if(col)values[col-1]=value;
+}
+function cloneCellValue(value){
+  if(value===undefined||value===null)return '';
+  if(value instanceof Date)return new Date(value.getTime());
+  if(typeof value==='object'){
+    try{return JSON.parse(JSON.stringify(value));}
+    catch(error){return value;}
+  }
+  return value;
+}
+function cloneRowValues(record){
+  return record.values.map(cloneCellValue);
+}
+
+async function loadSallaProducts(event){
+  sallaFile=event.target.files[0];if(!sallaFile)return;
+  sallaBuffer=await readArrayBuffer(sallaFile);
+  sallaWorkbook=new ExcelJS.Workbook();
+  await sallaWorkbook.xlsx.load(sallaBuffer);
+  sallaWorksheet=sallaWorkbook.worksheets[0];
+  document.getElementById('sallaZone').classList.add('ok');
+  document.getElementById('sallaInfo').textContent=`تم اختيار ${sallaFile.name}`;
+  checkReady();
+}
+async function loadSupplierCsv(event){
+  supplierFile=event.target.files[0];if(!supplierFile)return;
+  document.getElementById('supplierZone').classList.add('ok');
+  document.getElementById('supplierInfo').textContent=`تم اختيار ${supplierFile.name}`;
+  checkReady();
+}
+async function loadPriceListXls(event){
+  priceListFile=event.target.files[0];if(!priceListFile)return;
+  document.getElementById('priceListZone').classList.add('ok');
+  document.getElementById('priceListInfo').textContent=`تم اختيار ${priceListFile.name}`;
+  checkReady();
+}
+
+function readSallaCatalogWorkbook(){
+  headerMap={};headerList=[];sallaRows=[];products=[];rowsBySku=new Map();
+  const headerRow=sallaWorksheet.getRow(2);
+  headerRow.eachCell({includeEmpty:true},(cell,col)=>{
+    const header=cellText(cell);
+    headerList[col-1]=header;
+    if(header)headerMap[header]=col;
+  });
+  if(!headerCol('type'))throw new Error('لم أجد عمود النوع في ملف سلة');
+  if(!headerCol('name'))throw new Error('لم أجد عمود أسم المنتج في ملف سلة');
+  if(!headerCol('sku'))throw new Error('لم أجد عمود رمز المنتج sku في ملف سلة');
+  let currentProduct=null;
+  sallaWorksheet.eachRow((row,rowNumber)=>{
+    if(rowNumber<=2)return;
+    const values=[];
+    for(let col=1;col<=headerList.length;col++)values[col-1]=cloneCellValue(cellValue(row.getCell(col)));
+    const record={rowNumber,values,type:cleanText(values[headerCol('type')-1]),name:cleanText(values[headerCol('name')-1]),options:[],parent:null};
+    record.sku=skuFor(record);
+    record.id=idFor(record);
+    if(!record.type&&!record.name&&!record.sku)return;
+    sallaRows.push(record);
+    if(record.type==='منتج'){
+      currentProduct=record;
+      products.push(record);
+    }else if(record.type==='خيار'&&currentProduct){
+      record.parent=currentProduct;
+      currentProduct.options.push(record);
+    }else if(record.type==='خيار'&&!currentProduct){
+      warningCases.push({handle:'',reason:'صف خيار في ملف سلة بدون منتج أب قبله',supplierSkus:[],presentSkus:[record.sku].filter(Boolean),missingSkus:[]});
+    }
+    if(record.sku&&!rowsBySku.has(record.sku))rowsBySku.set(record.sku,record);
+  });
+}
+async function readSupplierCsvByHandle(){
+  const text=await supplierFile.text();
+  const parsed=Papa.parse(text,{header:true,skipEmptyLines:true});
+  if(parsed.errors?.length)throw new Error(parsed.errors[0].message);
+  supplierGroups=new Map();
+  for(const row of parsed.data){
+    const handle=cleanText(row.Handle);
+    const sku=cleanSku(row['Variant SKU']);
+    if(!handle||!sku){
+      if(sku||handle)warningCases.push({handle,reason:'صف مورد ناقص Handle أو Variant SKU',supplierSkus:[sku].filter(Boolean),presentSkus:[],missingSkus:[]});
+      continue;
+    }
+    row._sku=sku;
+    row._handle=handle;
+    if(!supplierGroups.has(handle))supplierGroups.set(handle,[]);
+    if(!supplierGroups.get(handle).some(item=>item._sku===sku))supplierGroups.get(handle).push(row);
+  }
+  for(const [handle,rows] of [...supplierGroups]){
+    if(rows.length<2)supplierGroups.delete(handle);
+  }
+}
+async function readPriceListRows(){
+  const workbook=XLSX.read(await readArrayBuffer(priceListFile),{type:'array',cellDates:false});
+  const sheet=workbook.Sheets[workbook.SheetNames[0]];
+  const matrix=XLSX.utils.sheet_to_json(sheet,{header:1,defval:''});
+  const headerIndex=matrix.findIndex(row=>{
+    const names=row.map(cleanText);
+    return names.includes('Item#')&&names.includes('Name')&&names.includes('Brand')&&names.includes('Size/Type')&&names.includes('Retail Price')&&names.includes('Cost');
+  });
+  if(headerIndex<0)throw new Error('لم أجد عناوين ملف AllFragrances: Item#, Name, Brand, Size/Type, Retail Price, Cost');
+  const headers=matrix[headerIndex].map(cleanText);
+  const required=['Item#','Name','Brand','Size/Type','Retail Price','Cost'];
+  for(const header of required){
+    if(!headers.includes(header))throw new Error(`ملف AllFragrances لا يحتوي عمود ${header}`);
+  }
+  const rows=[];
+  for(let i=headerIndex+1;i<matrix.length;i++){
+    const source=matrix[i];
+    const item={};
+    headers.forEach((header,col)=>{if(header)item[header]=source[col]??'';});
+    const sku=cleanSku(item['Item#']);
+    if(!sku)continue;
+    item._sku=sku;
+    rows.push(item);
+  }
+  return rows;
+}
+function mapBySku(rows,field){
+  const map=new Map();
+  for(const row of rows){
+    const sku=cleanSku(row[field]??row._sku);
+    if(sku&&!map.has(sku))map.set(sku,row);
+  }
+  return map;
+}
+function productHasOptions(record){return record.type==='منتج'&&record.options.length>0;}
+function supplierRowBySku(rows,sku){return rows.find(row=>row._sku===sku)||{};}
+function summarizeOptionSkus(parent){
+  return parent.options.map(option=>option.sku).filter(Boolean);
+}
+function classifyOptionProblems(){
+  autoFixCases=[];manualOnlyCases=[];
+  for(const [handle,groupRows] of supplierGroups){
+    const supplierSkus=groupRows.map(row=>row._sku).filter(Boolean);
+    const foundRecords=supplierSkus.map(sku=>rowsBySku.get(sku)).filter(Boolean);
+    const presentSkus=foundRecords.map(record=>record.sku).filter(Boolean);
+    const missingSkus=supplierSkus.filter(sku=>!rowsBySku.has(sku));
+    const optionRecords=foundRecords.filter(record=>record.type==='خيار'&&record.parent);
+    const parentCandidates=[...new Map(optionRecords.map(record=>[record.parent.rowNumber,record.parent])).values()];
+    const simpleRecords=foundRecords.filter(record=>record.type==='منتج'&&!productHasOptions(record));
+    if(parentCandidates.length===1&&simpleRecords.length>0){
+      const parent=parentCandidates[0];
+      const converted=simpleRecords.map(record=>({record,supplierRow:supplierRowBySku(groupRows,record.sku)}));
+      for(const item of converted){
+        const info=optionValueInfo(item.record);
+        if(info.source!=='AllFragrances'){
+          warningCases.push({handle,reason:`قيمة خيار ${item.record.sku} من ${info.source} وليست من AllFragrances`,supplierSkus,presentSkus,missingSkus});
+        }
+      }
+      if(missingSkus.length>0){
+        warningCases.push({handle,reason:'الحالة الأولى قابلة للتصدير لكن بعض SKUs المورد غير موجودة في ملف سلة',supplierSkus,presentSkus,missingSkus});
+      }
+      autoFixCases.push({kind:'autoFix',handle,parent,existingOptions:parent.options,converted,supplierSkus,missingSkus});
+      continue;
+    }
+    if(parentCandidates.length===0&&missingSkus.length===0&&simpleRecords.length===supplierSkus.length&&simpleRecords.length>1){
+      manualOnlyCases.push({kind:'manualOnly',handle,records:simpleRecords,supplierRows:groupRows,reason:'لا يوجد أب حالي في سلة'});
+      continue;
+    }
+    if(parentCandidates.length>1){
+      warningCases.push({handle,reason:'أكثر من منتج أب محتمل لنفس Handle',supplierSkus,presentSkus,missingSkus});
+    }else if(parentCandidates.length===0&&simpleRecords.length>0){
+      warningCases.push({handle,reason:'المجموعة فيها منتجات عادية لكن بعض SKUs ناقصة أو التصنيف غير مكتمل',supplierSkus,presentSkus,missingSkus});
+    }else if(missingSkus.length>0){
+      warningCases.push({handle,reason:'بعض SKUs المورد غير موجودة في ملف سلة',supplierSkus,presentSkus,missingSkus});
+    }
+  }
+}
+function exportRowCount(){
+  let count=0;
+  for(const item of autoFixCases){
+    count+=1+item.existingOptions.length+item.converted.length;
+  }
+  return count;
+}
+async function analyzeOptions(){
+  try{
+    document.getElementById('logBox').innerHTML='';
+    document.getElementById('downloadBtn').disabled=true;
+    setProgress(10);
+    warningCases=[];
+    readSallaCatalogWorkbook();
+    setProgress(35);
+    await readSupplierCsvByHandle();
+    priceRows=await readPriceListRows();
+    priceBySku=mapBySku(priceRows,'Item#');
+    setProgress(60);
+    classifyOptionProblems();
+    setProgress(85);
+    renderAllPreviews();
+    document.getElementById('stHandles').textContent=supplierGroups.size.toLocaleString();
+    document.getElementById('stAuto').textContent=autoFixCases.length.toLocaleString();
+    document.getElementById('stManual').textContent=manualOnlyCases.length.toLocaleString();
+    document.getElementById('stWarnings').textContent=warningCases.length.toLocaleString();
+    document.getElementById('stExportRows').textContent=exportRowCount().toLocaleString();
+    document.getElementById('stats').style.display='grid';
+    document.getElementById('tabs').style.display='flex';
+    document.getElementById('downloadBtn').disabled=autoFixCases.length===0;
+    document.getElementById('downloadAutoFixPreviewBtn').disabled=autoFixCases.length===0;
+    logMsg(`تم تحليل ${supplierGroups.size.toLocaleString()} Handle متعدد الخيارات`);
+    logMsg(`الحالة الأولى: ${autoFixCases.length.toLocaleString()} مجموعة قابلة للتصدير`);
+    logMsg(`الحالة الثانية: ${manualOnlyCases.length.toLocaleString()} مجموعة تحتاج حل يدوي`);
+    logMsg(`التحذيرات: ${warningCases.length.toLocaleString()} حالة`);
+    setProgress(100);hideProgress();
+  }catch(error){
+    hideProgress();
+    logMsg(`خطأ: ${escapeHtml(error.message)}`);
+  }
+}
+function showPanel(id,button){
+  document.querySelectorAll('.tab').forEach(tab=>tab.classList.remove('on'));
+  button.classList.add('on');
+  document.querySelectorAll('.panel').forEach(panel=>panel.classList.remove('on'));
+  document.getElementById(id).classList.add('on');
+}
+function filtered(data,query){
+  const q=cleanText(query).toLowerCase();
+  if(!q)return data;
+  return data.filter(item=>JSON.stringify(item,(key,value)=>key==='values'||key==='parent'||key==='options'?undefined:value).toLowerCase().includes(q));
+}
+function renderAllPreviews(){
+  renderAutoFixPreview();
+  renderManualOnlyPreview();
+  renderWarningsPreview();
+}
+function renderAutoFixPreview(){
+  const body=document.getElementById('autoFixBody'), empty=document.getElementById('autoFixEmpty');
+  const data=filtered(autoFixCases,document.getElementById('autoSearch').value);
+  let html='', idx=0;
+  for(const item of data){
+    const optionSkus=summarizeOptionSkus(item.parent).join(', ');
+    for(const converted of item.converted){
+      const valueInfo=optionValueInfo(converted.record);
+      html+=`<tr>
+        <td>${++idx}</td>
+        <td dir="ltr">${escapeHtml(item.handle)}</td>
+        <td>${escapeHtml(item.parent.name)}</td>
+        <td>${escapeHtml(item.parent.id||'')}</td>
+        <td dir="ltr">${escapeHtml(optionSkus)}</td>
+        <td>${escapeHtml(converted.record.name)}</td>
+        <td>${escapeHtml(converted.record.id||'')}</td>
+        <td dir="ltr">${escapeHtml(converted.record.sku)}</td>
+        <td>${escapeHtml(valueInfo.value)}</td>
+        <td>${escapeHtml(valueInfo.source)}</td>
+        <td><span class="pill ok">سيدخل ملف الإصلاح</span></td>
+      </tr>`;
+    }
+  }
+  body.innerHTML=html;
+  empty.style.display=html?'none':'block';
+}
+function renderManualOnlyPreview(){
+  const body=document.getElementById('manualOnlyBody'), empty=document.getElementById('manualOnlyEmpty');
+  const data=filtered(manualOnlyCases,document.getElementById('manualSearch').value);
+  let html='', idx=0;
+  for(const item of data){
+    const names=item.records.map(record=>record.name).join(' | ');
+    const ids=item.records.map(record=>record.id||'').filter(Boolean).join(', ');
+    const skus=item.records.map(record=>record.sku).join(', ');
+    const infos=item.records.map(optionValueInfo);
+    const values=infos.map(info=>info.value).filter(Boolean).join(' | ');
+    const sources=uniqueValues(infos.map(info=>info.source)).join(' | ');
+    html+=`<tr>
+      <td>${++idx}</td>
+      <td dir="ltr">${escapeHtml(item.handle)}</td>
+      <td>${item.records.length.toLocaleString()}</td>
+      <td>${escapeHtml(names)}</td>
+      <td>${escapeHtml(ids)}</td>
+      <td dir="ltr">${escapeHtml(skus)}</td>
+      <td>${escapeHtml(values)}</td>
+      <td>${escapeHtml(sources)}</td>
+      <td><span class="pill warn">${escapeHtml(item.reason)}</span></td>
+    </tr>`;
+  }
+  body.innerHTML=html;
+  empty.style.display=html?'none':'block';
+}
+function renderWarningsPreview(){
+  const body=document.getElementById('warningsBody'), empty=document.getElementById('warningsEmpty');
+  const data=filtered(warningCases,document.getElementById('warningSearch').value);
+  let html='', idx=0;
+  for(const item of data){
+    html+=`<tr>
+      <td>${++idx}</td>
+      <td dir="ltr">${escapeHtml(item.handle||'')}</td>
+      <td><span class="pill bad">${escapeHtml(item.reason)}</span></td>
+      <td dir="ltr">${escapeHtml((item.supplierSkus||[]).join(', '))}</td>
+      <td dir="ltr">${escapeHtml((item.presentSkus||[]).join(', '))}</td>
+      <td dir="ltr">${escapeHtml((item.missingSkus||[]).join(', '))}</td>
+    </tr>`;
+  }
+  body.innerHTML=html;
+  empty.style.display=html?'none':'block';
+}
+function clearProductOnlyFields(values){
+  ['category','productImage','imageAlt','readyType','description','shipping','brand','promo','pinned','addImage','weight','unit','taxable','taxReason','option1Name','option1Type'].forEach(key=>setByHeader(values,key,''));
+}
+function convertedOptionValues(parent,converted){
+  const values=cloneRowValues(converted.record);
+  setByHeader(values,'type','خيار');
+  setByHeader(values,'name',parent.name);
+  clearProductOnlyFields(values);
+  setByHeader(values,'option1Value',optionValueInfo(converted.record).value);
+  setByHeader(values,'option1Image',largeImageUrl(converted.supplierRow['Image Src']||valueFor(converted.record,'productImage')));
+  return values;
+}
+function cloneStyle(style){return style?JSON.parse(JSON.stringify(style)):{};}
+function captureRowStyle(worksheet,rowNumber){
+  const styles={};
+  worksheet.getRow(rowNumber).eachCell({includeEmpty:true},(cell,col)=>{styles[col]=cloneStyle(cell.style);});
+  return styles;
+}
+function applyStyle(row,styleTemplate){
+  row.eachCell({includeEmpty:true},(cell,col)=>{
+    if(styleTemplate[col])cell.style=cloneStyle(styleTemplate[col]);
+  });
+}
+function addStyledRow(worksheet,values,style,height){
+  const row=worksheet.addRow(values);
+  row.height=height;
+  applyStyle(row,style);
+  return row;
+}
+function clearTemplateDataRows(worksheet){
+  const removeCount=Math.max(worksheet.rowCount-2,0);
+  if(removeCount>0)worksheet.spliceRows(3,removeCount);
+  if(Array.isArray(worksheet._rows)){
+    worksheet._rows=worksheet._rows.slice(0,2);
+  }
+}
+function addAutoFixRowsToWorksheet(worksheet,productStyle,optionStyle,productHeight,optionHeight){
+  for(const item of autoFixCases){
+    addStyledRow(worksheet,cloneRowValues(item.parent),productStyle,productHeight);
+    for(const option of item.existingOptions){
+      addStyledRow(worksheet,cloneRowValues(option),optionStyle,optionHeight);
+    }
+    for(const converted of item.converted){
+      addStyledRow(worksheet,convertedOptionValues(item.parent,converted),optionStyle,optionHeight);
+    }
+  }
+}
+async function buildAutoFixWorkbook(){
+  const workbook=new ExcelJS.Workbook();
+  await workbook.xlsx.load(sallaBuffer);
+  const worksheet=workbook.worksheets[0];
+  const firstParent=autoFixCases[0].parent;
+  const firstOption=autoFixCases[0].existingOptions[0]||autoFixCases[0].converted[0].record;
+  const productStyle=captureRowStyle(worksheet,firstParent.rowNumber);
+  const optionStyle=captureRowStyle(worksheet,firstOption.rowNumber);
+  const productHeight=worksheet.getRow(firstParent.rowNumber).height;
+  const optionHeight=worksheet.getRow(firstOption.rowNumber).height;
+  clearTemplateDataRows(worksheet);
+  addAutoFixRowsToWorksheet(worksheet,productStyle,optionStyle,productHeight,optionHeight);
+  return workbook;
+}
+async function downloadWorkbook(workbook,filename){
+  const buffer=await workbook.xlsx.writeBuffer();
+  const blob=new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const anchor=document.createElement('a');
+  anchor.href=URL.createObjectURL(blob);
+  anchor.download=filename;
+  anchor.click();
+  URL.revokeObjectURL(anchor.href);
+}
+async function downloadAutoFixPreviewXlsx(){
+  try{
+    if(!autoFixCases.length){logMsg('لا توجد حالات في معاينة الحالة الأولى');return;}
+    setProgress(10);
+    const workbook=await buildAutoFixWorkbook();
+    setProgress(75);
+    await downloadWorkbook(workbook,`salla_options_case1_preview_${new Date().toISOString().slice(0,10)}.xlsx`);
+    setProgress(100);hideProgress();
+    logMsg(`تم تجهيز معاينة الحالة الأولى بمجموعات الإصلاح فقط بعدد ${exportRowCount().toLocaleString()} صف`);
+  }catch(error){
+    hideProgress();
+    logMsg(`خطأ في تصدير معاينة الحالة الأولى: ${escapeHtml(error.message)}`);
+  }
+}
+async function downloadOptionsFixXlsx(){
+  try{
+    if(!autoFixCases.length){logMsg('لا توجد حالات قابلة للتصدير');return;}
+    setProgress(10);
+    const workbook=await buildAutoFixWorkbook();
+    setProgress(75);
+    await downloadWorkbook(workbook,`salla_options_fix_${new Date().toISOString().slice(0,10)}.xlsx`);
+    setProgress(100);hideProgress();
+    logMsg(`تم تجهيز ملف الإصلاح بعدد ${exportRowCount().toLocaleString()} صف`);
+  }catch(error){
+    hideProgress();
+    logMsg(`خطأ في التصدير: ${escapeHtml(error.message)}`);
+  }
+}
+</script>
+</body>
+</html>

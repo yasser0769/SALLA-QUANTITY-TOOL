@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ترجمة أوصاف منتجات سلة</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<style>
+:root{
+  --bg:#f6f8fb;--surface:#ffffff;--surface2:#f8fafc;--surface3:#eef2f7;
+  --border:#dbe3ed;--border2:#c7d2df;--text:#111827;--text2:#4b5563;--text3:#7b8494;
+  --accent:#0d9488;--accent-dim:rgba(13,148,136,.1);--green:#16a34a;--red:#e11d48;--amber:#d97706;
+  --green-dim:rgba(22,163,74,.11);--red-dim:rgba(225,29,72,.1);--amber-dim:rgba(217,119,6,.12);
+  --violet:#7c3aed;--violet-dim:rgba(124,58,237,.1);--shadow:0 16px 36px rgba(15,23,42,.08);--radius:10px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{background:var(--bg)}
+body{font-family:'IBM Plex Sans Arabic',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:linear-gradient(180deg,#ffffff 0,#f6f8fb 280px);color:var(--text);min-height:100vh;line-height:1.65}
+.grain{position:fixed;inset:0;pointer-events:none;opacity:.012;z-index:9999;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.app{max-width:1220px;margin:0 auto;padding:38px 20px 80px;position:relative;z-index:1}
+.hdr{text-align:center;margin-bottom:30px;border-bottom:1px solid var(--border);padding-bottom:26px}
+.badge{display:inline-flex;align-items:center;padding:5px 12px;border:1px solid rgba(13,148,136,.22);border-radius:999px;font-size:.68rem;font-weight:700;background:var(--accent-dim);color:#0f766e;margin-bottom:13px}
+h1{font-size:clamp(1.55rem,3vw,2.1rem);font-weight:700;margin-bottom:8px}
+.hdr p{color:var(--text2);font-size:.92rem;font-weight:400;max-width:780px;margin:0 auto}
+.top-links{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin-top:12px}
+.top-links a{color:var(--accent);font-size:.82rem;font-weight:700;text-decoration:none}
+.note,.panel{background:linear-gradient(180deg,#ffffff,#f8fafc);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+.note{border-inline-start:3px solid var(--accent);padding:17px 20px;margin-bottom:20px;font-size:.82rem;color:var(--text2);line-height:1.95}
+.note strong{color:var(--text)}
+.uploads{display:grid;grid-template-columns:minmax(240px,1fr) minmax(240px,1fr);gap:14px;margin-bottom:20px}
+@media(max-width:760px){.uploads{grid-template-columns:1fr}}
+.upload-zone{background:linear-gradient(180deg,var(--surface2),var(--surface));border:1px dashed var(--border2);border-radius:var(--radius);padding:24px 18px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s,transform .2s,box-shadow .2s;min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.upload-zone:hover{border-color:var(--accent);background:#f0fdfa;transform:translateY(-2px);box-shadow:var(--shadow)}
+.upload-zone.ok{border-style:solid;border-color:rgba(34,197,94,.65);background:linear-gradient(180deg,rgba(34,197,94,.08),var(--surface))}
+.upload-zone input{display:none}
+.upload-zone .ico{font-size:1.55rem;font-weight:800;color:var(--accent);margin-bottom:8px}
+.upload-zone h3{font-size:.95rem;font-weight:700;margin-bottom:3px}
+.upload-zone .sub{font-size:.74rem;color:var(--text2)}
+.file-info{font-size:.76rem;color:var(--green);margin-top:10px;font-weight:600;word-break:break-word}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}
+.btn{padding:11px 17px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit;font-size:.86rem;font-weight:700;cursor:pointer;transition:all .2s}
+.btn:hover:not(:disabled){border-color:var(--accent);background:var(--surface2);transform:translateY(-1px)}
+.btn.primary{background:linear-gradient(135deg,#0d9488,#0f766e);border-color:transparent;color:#fff;box-shadow:0 14px 30px rgba(13,148,136,.18)}
+.btn.small{padding:6px 9px;font-size:.72rem;border-radius:6px}
+.btn:disabled{opacity:.38;cursor:not-allowed;box-shadow:none}
+.progress{height:4px;background:var(--surface2);border-radius:4px;margin-bottom:20px;overflow:hidden;display:none}
+.progress .bar{height:100%;background:linear-gradient(90deg,var(--accent),#a78bfa,var(--amber));width:0;transition:width .3s}
+.log{background:#f8fafc;border:1px solid var(--border);border-radius:var(--radius);padding:13px 16px;margin-bottom:20px;font-size:.75rem;color:var(--text2);max-height:126px;overflow-y:auto;display:none;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.stats{display:none;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:10px;margin-bottom:20px}
+.stat{background:linear-gradient(180deg,#ffffff,var(--surface2));border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center}
+.stat .n{font-size:1.42rem;font-weight:700;margin-bottom:1px}
+.stat .l{font-size:.7rem;color:var(--text2)}
+.layout{display:grid;grid-template-columns:280px minmax(0,1fr);gap:16px;align-items:start}
+@media(max-width:980px){.layout{grid-template-columns:1fr}}
+.panel{display:none;padding:16px;margin-bottom:20px}
+.panel.on{display:block}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.panel h2{font-size:1.05rem}
+.muted{color:var(--text3)}
+.search,.field input,.field select{width:100%;padding:10px 12px;background:#ffffff;border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;outline:none;min-height:42px}
+.field label{display:block;font-size:.7rem;color:var(--text2);margin-bottom:5px;font-weight:700}
+.settings-grid{display:grid;grid-template-columns:minmax(140px,1fr) minmax(170px,1fr) minmax(120px,.7fr) minmax(230px,1.7fr);gap:10px;align-items:end;margin-bottom:12px}
+@media(max-width:900px){.settings-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:620px){.settings-grid{grid-template-columns:1fr}}
+.brand-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.brand-grid{display:grid;grid-template-columns:1fr;gap:8px;max-height:470px;overflow:auto;padding-inline-end:4px}
+.brand-item{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#ffffff;border:1px solid var(--border);border-radius:8px;padding:9px 10px;font-size:.8rem}
+.brand-item label{display:flex;align-items:center;gap:8px;cursor:pointer;min-width:0}
+.brand-item input{accent-color:var(--accent)}
+.brand-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.count{color:var(--text3);font-size:.72rem;white-space:nowrap}
+.preview-tools{display:grid;grid-template-columns:minmax(220px,1.4fr) repeat(2,minmax(150px,1fr)) auto;gap:8px;margin-bottom:12px;align-items:center}
+.preview-tools .search,.preview-tools select{width:100%;padding:10px 12px;background:#ffffff;border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;outline:none;min-height:42px}
+@media(max-width:900px){.preview-tools{grid-template-columns:1fr 1fr}.preview-tools .btn{grid-column:1/-1}}
+@media(max-width:620px){.preview-tools{grid-template-columns:1fr}}
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:auto;max-height:66vh;box-shadow:var(--shadow)}
+table{width:100%;border-collapse:collapse;font-size:.76rem;min-width:1750px}
+thead{position:sticky;top:0;z-index:2}
+th{background:#f1f5f9;padding:12px 9px;font-weight:700;text-align:right;color:var(--text2);font-size:.71rem;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:10px 9px;border-bottom:1px solid rgba(219,227,237,.78);vertical-align:top}
+tr:hover td{background:rgba(13,148,136,.055)}
+.pill{display:inline-block;padding:2px 8px;border-radius:5px;font-size:.68rem;font-weight:700;white-space:nowrap}
+.pill.ok,.pill.edited{background:var(--green-dim);color:var(--green)}
+.pill.failed{background:var(--red-dim);color:var(--red)}
+.pill.skipped{background:var(--amber-dim);color:var(--amber)}
+.pill.pending{background:var(--violet-dim);color:var(--violet)}
+.pill.untranslated{background:rgba(112,120,135,.16);color:var(--text2)}
+.description-cell{width:360px;min-width:360px;max-width:360px;white-space:normal;color:var(--text2);line-height:1.8}
+.translated-editor{width:420px;min-width:420px;min-height:120px;resize:vertical;padding:10px 12px;background:#ffffff;border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:.78rem;line-height:1.75;outline:none}
+.translated-editor:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(13,148,136,.12)}
+.empty{text-align:center;padding:36px;color:var(--text3);font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<main class="app">
+  <header class="hdr">
+    <div class="badge">SALLA DESCRIPTION TRANSLATION TOOL</div>
+    <h1>ترجمة أوصاف منتجات سلة</h1>
+    <p>ارفع ملف منتجات سلة الكامل، اختر ماركة أو أكثر، ثم ترجم الأوصاف الإنجليزية فقط وصدّر ملفاً يحتوي المنتجات التي تمت ترجمتها مع خياراتها.</p>
+    <div class="top-links">
+      <a href="index.html">الرجوع لتحديث الأسعار والكميات</a>
+      <a href="new-products.html">صفحة المنتجات الجديدة</a>
+      <a href="fix-options.html">إصلاح خيارات المنتجات</a>
+    </div>
+  </header>
+
+  <div class="note">
+    <strong>فلترة اللغة:</strong> لا تدخل الترجمة إلا الأوصاف الإنجليزية فقط. أي وصف يحتوي حروف عربية يعتبر مترجماً أو مختلطاً ويتم تخطيه.<br>
+    <strong>الماركات:</strong> لا توجد ماركات محددة افتراضياً؛ اختر ماركة أو أكثر قبل بدء الترجمة حتى لا تترجم منتجات غير مقصودة.<br>
+    <strong>التصدير:</strong> الملف الناتج يحافظ على صيغة ملف سلة، ويحتوي فقط المنتجات التي تم ترجمة وصفها أو تعديلها بنجاح، ومعها خياراتها الأصلية إذا كانت موجودة.
+  </div>
+
+  <div class="uploads">
+    <div class="upload-zone" onclick="this.querySelector('input').click()" id="sallaZone">
+      <input type="file" id="sallaFile" accept=".xlsx,.xls" onchange="loadSallaProducts(event)">
+      <div class="ico">XLSX</div>
+      <h3>ملف منتجات سلة الكامل</h3>
+      <div class="sub">تصدير المنتجات الكامل من سلة</div>
+      <div class="file-info" id="sallaInfo"></div>
+    </div>
+    <div class="upload-zone">
+      <div class="ico">EN</div>
+      <h3>إنجليزي فقط</h3>
+      <div class="sub">الأوصاف العربية أو المختلطة يتم تخطيها تلقائياً</div>
+      <div class="file-info" id="scopeInfo">لا توجد ماركات محددة</div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="analyzeBtn" disabled onclick="analyzeDescriptions()">تحليل الأوصاف</button>
+    <button class="btn primary" id="translateBtn" disabled onclick="translateDescriptions()">ترجمة الأوصاف المختارة</button>
+    <button class="btn" id="retryBtn" disabled onclick="retryFailedTranslations()">إعادة ترجمة الفاشل</button>
+    <button class="btn" id="pauseBtn" disabled onclick="pauseTranslations()">إيقاف مؤقت</button>
+    <button class="btn" id="resumeBtn" disabled onclick="resumeTranslations()">استئناف</button>
+    <button class="btn primary" id="downloadBtn" disabled onclick="downloadTranslatedDescriptions()">تحميل ملف الترجمة</button>
+  </div>
+
+  <div class="progress" id="progress"><div class="bar" id="bar"></div></div>
+  <div class="log" id="logBox"></div>
+
+  <div class="stats" id="stats">
+    <div class="stat"><div class="n" id="stProducts">0</div><div class="l">منتجات</div></div>
+    <div class="stat"><div class="n" id="stBrands">0</div><div class="l">ماركات</div></div>
+    <div class="stat"><div class="n" id="stSelected" style="color:var(--accent)">0</div><div class="l">ضمن الماركات</div></div>
+    <div class="stat"><div class="n" id="stReady" style="color:var(--violet)">0</div><div class="l">جاهز للترجمة</div></div>
+    <div class="stat"><div class="n" id="stArabic" style="color:var(--amber)">0</div><div class="l">متخطى عربي/مختلط</div></div>
+    <div class="stat"><div class="n" id="stOk" style="color:var(--green)">0</div><div class="l">مترجم/معدل</div></div>
+    <div class="stat"><div class="n" id="stFailed" style="color:var(--red)">0</div><div class="l">فاشل</div></div>
+    <div class="stat"><div class="n" id="stExport" style="color:var(--accent)">0</div><div class="l">جاهز للتصدير</div></div>
+  </div>
+
+  <div class="layout">
+    <section class="panel" id="brandPanel">
+      <div class="panel-head">
+        <h2>فلتر الماركات</h2>
+        <span class="muted" id="brandNote">لا توجد ماركات محددة</span>
+      </div>
+      <input class="search" id="brandSearch" placeholder="بحث في الماركات..." oninput="renderBrandChecks()">
+      <div class="brand-tools">
+        <button class="btn small" onclick="setVisibleBrands(true)">تحديد الظاهر</button>
+        <button class="btn small" onclick="setVisibleBrands(false)">إلغاء الظاهر</button>
+      </div>
+      <div class="brand-grid" id="brandChecks"></div>
+    </section>
+
+    <section class="panel" id="previewPanel">
+      <div class="panel-head">
+        <h2>معاينة الترجمة والتعديل</h2>
+        <span class="muted" id="previewNote"></span>
+      </div>
+
+      <div class="settings-grid">
+        <div class="field">
+          <label for="translationProvider">مزود API</label>
+          <select id="translationProvider" onchange="syncTranslationModelOptions()">
+            <option value="deepseek">DeepSeek</option>
+            <option value="openrouter">OpenRouter</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="translationModel">الموديل</label>
+          <select id="translationModel">
+            <option value="deepseek-v4-flash">DeepSeek V4 Flash</option>
+            <option value="deepseek-v4-pro">DeepSeek V4 Pro</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="translationMinLength">ترجم إذا الوصف أكبر من</label>
+          <input id="translationMinLength" type="number" min="0" step="1" value="70" oninput="refreshTranslationEligibility()">
+        </div>
+        <div class="field">
+          <label for="translationApiKey">API Key</label>
+          <input id="translationApiKey" type="password" autocomplete="off" placeholder="sk-...">
+        </div>
+      </div>
+
+      <div class="preview-tools">
+        <input class="search" id="previewSearch" placeholder="بحث في المنتجات..." oninput="renderPreview()">
+        <select id="statusFilter" onchange="renderPreview()" aria-label="فلتر حالة الترجمة">
+          <option value="all">كل الحالات</option>
+          <option value="untranslated">جاهز</option>
+          <option value="ok">ناجح</option>
+          <option value="edited">معدل</option>
+          <option value="failed">فاشل</option>
+          <option value="skipped">متخطى</option>
+        </select>
+        <select id="optionFilter" onchange="renderPreview()" aria-label="فلتر الخيارات">
+          <option value="all">كل المنتجات</option>
+          <option value="with_options">لها خيارات</option>
+          <option value="simple">عادية</option>
+        </select>
+        <button class="btn" onclick="resetPreviewFilters()">مسح الفلاتر</button>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>#</th><th>الحالة</th><th>الماركة</th><th>اسم المنتج</th><th>SKU</th><th>خيارات</th><th>الوصف الأصلي</th><th>الوصف الجديد</th><th>السبب</th>
+          </tr></thead>
+          <tbody id="previewBody"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="emptyPreview" style="display:none">لا توجد منتجات ضمن الفلاتر الحالية</div>
+    </section>
+  </div>
+</main>
+
+<script>
+let sallaFile=null, sallaBuffer=null, sallaWorkbook=null, sallaWorksheet=null;
+let headerMap={}, headerList=[], products=[], selectedBrands=new Set(), translationStates=new Map();
+let translationRunning=false, translationPaused=false, translationQueue=[], translationQueueIndex=0, translationQueueFilter='all';
+const TRANSLATION_API_TIMEOUT_MS=90000;
+const TRANSLATION_PROVIDERS={
+  deepseek:{endpoint:'https://api.deepseek.com/chat/completions'},
+  openrouter:{endpoint:'https://openrouter.ai/api/v1/chat/completions'}
+};
+const TRANSLATION_MODELS={
+  deepseek:[
+    {value:'deepseek-v4-flash',label:'DeepSeek V4 Flash'},
+    {value:'deepseek-v4-pro',label:'DeepSeek V4 Pro'}
+  ],
+  openrouter:[
+    {value:'deepseek/deepseek-v4-pro',label:'DeepSeek V4 Pro عبر OpenRouter'},
+    {value:'deepseek/deepseek-chat',label:'DeepSeek Chat عبر OpenRouter'}
+  ]
+};
+const HEADER_ALIASES={
+  type:['النوع','النوع '],
+  name:['أسم المنتج','اسم المنتج'],
+  sku:['رمز المنتج sku','رمز المنتج SKU','sku','SKU'],
+  description:['الوصف'],
+  imageAlt:['وصف صورة المنتج'],
+  brand:['الماركة']
+};
+
+function setProgress(pct){document.getElementById('progress').style.display='block';document.getElementById('bar').style.width=pct+'%';}
+function hideProgress(){setTimeout(()=>{document.getElementById('progress').style.display='none';},350)}
+function logMsg(msg){const box=document.getElementById('logBox');box.style.display='block';box.innerHTML+=msg+'<br>';box.scrollTop=box.scrollHeight;}
+function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+function escapeAttr(value){return escapeHtml(value).replace(/\n/g,'&#10;');}
+function cleanText(value){return String(value??'').replace(/\s+/g,' ').trim();}
+function cleanSku(value){
+  const text=cleanText(value);
+  if(/^\d+(?:\.0+)?$/.test(text))return text.replace(/\.0+$/,'');
+  return text.replace(/[^\dA-Za-z_-]/g,'');
+}
+function cellValue(cell){return cell?.value?.text ?? cell?.value?.result ?? cell?.value ?? '';}
+function cellText(cell){return cleanText(cellValue(cell));}
+function cloneCellValue(value){
+  if(value===undefined||value===null)return '';
+  if(value instanceof Date)return new Date(value.getTime());
+  if(typeof value==='object'){
+    try{return JSON.parse(JSON.stringify(value));}
+    catch(error){return value;}
+  }
+  return value;
+}
+function cloneRowValues(record){return record.values.map(cloneCellValue);}
+function headerCol(key){
+  for(const alias of HEADER_ALIASES[key]||[]){
+    if(headerMap[alias])return headerMap[alias];
+  }
+  return 0;
+}
+function valueFor(record,key){
+  const col=headerCol(key);
+  return col?record.values[col-1]:'';
+}
+function textFor(record,key){return cleanText(valueFor(record,key));}
+function setByHeader(values,key,value){
+  const col=headerCol(key);
+  if(col)values[col-1]=value;
+}
+function resetAnalysisState(){
+  headerMap={};headerList=[];products=[];selectedBrands=new Set();translationStates=new Map();
+  translationRunning=false;translationPaused=false;translationQueue=[];translationQueueIndex=0;translationQueueFilter='all';
+  document.getElementById('brandPanel').classList.remove('on');
+  document.getElementById('previewPanel').classList.remove('on');
+  document.getElementById('stats').style.display='none';
+  document.getElementById('previewBody').innerHTML='';
+  document.getElementById('brandChecks').innerHTML='';
+  document.getElementById('downloadBtn').disabled=true;
+  document.getElementById('translateBtn').disabled=true;
+  document.getElementById('retryBtn').disabled=true;
+  document.getElementById('pauseBtn').disabled=true;
+  document.getElementById('resumeBtn').disabled=true;
+  document.getElementById('scopeInfo').textContent='لا توجد ماركات محددة';
+}
+function htmlToPlainText(value){
+  return cleanText(String(value??'')
+    .replace(/<script[\s\S]*?<\/script>/gi,' ')
+    .replace(/<style[\s\S]*?<\/style>/gi,' ')
+    .replace(/<br\s*\/?>/gi,' ')
+    .replace(/<\/p>/gi,' ')
+    .replace(/<[^>]+>/g,' ')
+    .replace(/&nbsp;/g,' ')
+    .replace(/&amp;/g,'&'));
+}
+function cleanImageAltText(value){
+  return cleanText(value)
+    .normalize('NFD')
+    .replace(/[\u064B-\u065F\u0670]/g,'')
+    .replace(/[^\p{Script=Arabic}\p{Script=Latin}\s]+/gu,'')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+function comparableText(value){
+  return htmlToPlainText(value).toLowerCase().replace(/[^\p{Script=Arabic}\p{Script=Latin}\p{Number}\s]+/gu,'').replace(/\s+/g,' ').trim();
+}
+function translationMinLength(){
+  const input=document.getElementById('translationMinLength');
+  const value=Number(input?.value);
+  return Number.isFinite(value)&&value>=0?Math.floor(value):70;
+}
+function isEnglishOnlyDescription(description){
+  const plain=htmlToPlainText(description);
+  if(!plain)return{ok:false,reason:'الوصف فارغ'};
+  if(/[\u0600-\u06FF]/.test(plain))return{ok:false,reason:'الوصف يحتوي حروف عربية، لذلك يعتبر مترجماً أو مختلطاً'};
+  const letters=plain.match(/\p{Letter}/gu)||[];
+  const latin=plain.match(/\p{Script=Latin}/gu)||[];
+  const latinRatio=letters.length?latin.length/letters.length:0;
+  if(latin.length<20||latinRatio<0.75)return{ok:false,reason:'الوصف ليس إنجليزياً بشكل كاف'};
+  return{ok:true,reason:''};
+}
+function isTranslatableDescription(description, productTitle, minLength=translationMinLength()){
+  const plain=htmlToPlainText(description);
+  if(!plain)return{ok:false,status:'skipped_empty',reason:'الوصف فارغ'};
+  if(plain.length<=minLength)return{ok:false,status:'skipped_short',reason:`الوصف ${plain.length.toLocaleString()} حرف، لا يتجاوز حد الترجمة (${minLength.toLocaleString()})`};
+  const english=isEnglishOnlyDescription(description);
+  if(!english.ok)return{ok:false,status:'skipped_arabic_or_mixed',reason:english.reason};
+  const normalized=comparableText(plain);
+  const title=comparableText(productTitle);
+  if(title&&(normalized===title||((title.includes(normalized)||normalized.includes(title))&&plain.length<title.length+35))){
+    return{ok:false,status:'skipped_name_only',reason:'الوصف مطابق لاسم المنتج تقريبا'};
+  }
+  return{ok:true,status:'ready',reason:''};
+}
+function statusGroup(status){
+  if(status==='ok'||status==='edited'||status==='failed'||status==='pending')return status;
+  if(status==='manual_invalid')return'failed';
+  if(String(status||'').startsWith('skipped_'))return'skipped';
+  return'untranslated';
+}
+function statusLabel(status){
+  const value=statusGroup(status);
+  if(value==='ok')return'ناجح';
+  if(value==='edited')return'معدل';
+  if(value==='failed')return'فاشل';
+  if(value==='pending')return'قيد التنفيذ';
+  if(value==='skipped')return'متخطى';
+  return'جاهز';
+}
+function productKey(product){
+  return `${product.rowNumber}|${textFor(product,'sku')}|${textFor(product,'name')}`;
+}
+function stateFor(product){
+  return translationStates.get(product.key)||{status:'untranslated',reason:'جاهز للترجمة',cleaned:'',source:textFor(product,'description'),title:textFor(product,'name')};
+}
+function translatedValueForProduct(product){
+  const state=stateFor(product);
+  if((state.status==='ok'||state.status==='edited')&&validateTranslatedDescription(state.cleaned,state.title).ok)return state.cleaned;
+  return '';
+}
+function brandFor(product){return textFor(product,'brand')||'بدون ماركة';}
+function selectedProducts(){
+  if(selectedBrands.size===0)return[];
+  return products.filter(product=>selectedBrands.has(brandFor(product)));
+}
+function eligibleProductsForSelectedBrands(){
+  return selectedProducts().filter(product=>statusGroup(stateFor(product).status)==='untranslated');
+}
+function exportableProducts(){
+  return selectedProducts().filter(product=>Boolean(translatedValueForProduct(product)));
+}
+function optionCount(product){return product.options.length;}
+function readArrayBuffer(file){return file.arrayBuffer();}
+async function loadSallaProducts(event){
+  sallaFile=event.target.files[0];if(!sallaFile)return;
+  resetAnalysisState();
+  sallaBuffer=await readArrayBuffer(sallaFile);
+  sallaWorkbook=new ExcelJS.Workbook();
+  await sallaWorkbook.xlsx.load(sallaBuffer);
+  sallaWorksheet=sallaWorkbook.worksheets[0];
+  document.getElementById('sallaZone').classList.add('ok');
+  document.getElementById('sallaInfo').textContent=`تم اختيار ${sallaFile.name}`;
+  document.getElementById('analyzeBtn').disabled=false;
+}
+function readSallaCatalogWorkbook(){
+  headerMap={};headerList=[];products=[];translationStates=new Map();selectedBrands=new Set();
+  const duplicateHeaders=new Map();
+  const headerRow=sallaWorksheet.getRow(2);
+  headerRow.eachCell({includeEmpty:true},(cell,col)=>{
+    const header=cellText(cell);
+    headerList[col-1]=header;
+    if(header){
+      if(headerMap[header]){
+        duplicateHeaders.set(header,[...(duplicateHeaders.get(header)||[headerMap[header]]),col]);
+      }
+      headerMap[header]=col;
+    }
+  });
+  const sensitiveHeaders=['أسم المنتج','اسم المنتج','الوصف','وصف صورة المنتج','رمز المنتج sku','رمز المنتج SKU','الماركة','النوع','النوع '];
+  const duplicateSensitive=[...duplicateHeaders.keys()].filter(header=>sensitiveHeaders.includes(header));
+  if(duplicateSensitive.length)throw new Error(`ملف سلة يحتوي عناوين مكررة حساسة: ${duplicateSensitive.join('، ')}`);
+  if(!headerCol('type'))throw new Error('لم أجد عمود النوع في ملف سلة');
+  if(!headerCol('name'))throw new Error('لم أجد عمود أسم المنتج في ملف سلة');
+  if(!headerCol('description'))throw new Error('لم أجد عمود الوصف في ملف سلة');
+  if(!headerCol('brand'))throw new Error('لم أجد عمود الماركة في ملف سلة');
+  let currentProduct=null;
+  sallaWorksheet.eachRow((row,rowNumber)=>{
+    if(rowNumber<=2)return;
+    const values=[];
+    for(let col=1;col<=headerList.length;col++)values[col-1]=cloneCellValue(cellValue(row.getCell(col)));
+    const record={rowNumber,values,options:[],parent:null};
+    record.type=textFor(record,'type');
+    record.key=productKey(record);
+    if(!record.type&&!textFor(record,'name')&&!textFor(record,'sku'))return;
+    if(record.type==='منتج'){
+      currentProduct=record;
+      products.push(record);
+    }else if(record.type==='خيار'&&currentProduct){
+      record.parent=currentProduct;
+      currentProduct.options.push(record);
+    }
+  });
+}
+function prepareTranslationStates(){
+  for(const product of products){
+    const existing=translationStates.get(product.key);
+    if(existing&&['ok','edited','failed','pending'].includes(existing.status))continue;
+    const source=textFor(product,'description');
+    const title=textFor(product,'name');
+    const eligibility=isTranslatableDescription(source,title);
+    translationStates.set(product.key,{
+      status:eligibility.ok?'untranslated':eligibility.status,
+      reason:eligibility.ok?'جاهز للترجمة':eligibility.reason,
+      source,
+      title,
+      cleaned:existing?.cleaned||''
+    });
+  }
+}
+function brandsWithCounts(){
+  const counts=new Map();
+  for(const product of products){
+    const brand=brandFor(product);
+    counts.set(brand,(counts.get(brand)||0)+1);
+  }
+  return [...counts].sort((a,b)=>a[0].localeCompare(b[0]));
+}
+function visibleBrandEntries(){
+  const q=document.getElementById('brandSearch')?.value.trim().toLowerCase()||'';
+  return brandsWithCounts().filter(([brand])=>!q||brand.toLowerCase().includes(q));
+}
+function renderBrandChecks(){
+  const body=document.getElementById('brandChecks');
+  body.innerHTML=visibleBrandEntries().map(([brand,count])=>`
+    <div class="brand-item">
+      <label><input type="checkbox" ${selectedBrands.has(brand)?'checked':''} onchange="toggleBrand('${escapeAttr(encodeURIComponent(brand))}',this.checked)"><span class="brand-name">${escapeHtml(brand)}</span></label>
+      <span class="count">${count.toLocaleString()}</span>
+    </div>
+  `).join('');
+}
+function toggleBrand(encodedBrand,checked){
+  const brand=decodeURIComponent(encodedBrand);
+  if(checked)selectedBrands.add(brand);else selectedBrands.delete(brand);
+  updateStats();renderBrandChecks();renderPreview();
+}
+function setVisibleBrands(checked){
+  for(const [brand] of visibleBrandEntries()){
+    if(checked)selectedBrands.add(brand);else selectedBrands.delete(brand);
+  }
+  updateStats();renderBrandChecks();renderPreview();
+}
+function resetPreviewFilters(){
+  document.getElementById('previewSearch').value='';
+  document.getElementById('statusFilter').value='all';
+  document.getElementById('optionFilter').value='all';
+  renderPreview();
+}
+async function analyzeDescriptions(){
+  try{
+    document.getElementById('logBox').innerHTML='';
+    setProgress(10);
+    readSallaCatalogWorkbook();
+    setProgress(45);
+    prepareTranslationStates();
+    setProgress(75);
+    document.getElementById('brandPanel').classList.add('on');
+    document.getElementById('previewPanel').classList.add('on');
+    document.getElementById('stats').style.display='grid';
+    renderBrandChecks();
+    updateStats();
+    renderPreview();
+    setProgress(100);hideProgress();
+    logMsg(`تم تحليل ${products.length.toLocaleString()} منتج. اختر ماركة أو أكثر للترجمة.`);
+  }catch(error){
+    hideProgress();
+    logMsg(`خطأ: ${escapeHtml(error.message)}`);
+  }
+}
+function updateStats(){
+  const selected=selectedProducts();
+  const states=selected.map(stateFor);
+  const ready=states.filter(state=>statusGroup(state.status)==='untranslated').length;
+  const arabic=states.filter(state=>state.status==='skipped_arabic_or_mixed').length;
+  const ok=states.filter(state=>state.status==='ok'||state.status==='edited').length;
+  const failed=states.filter(state=>state.status==='failed').length;
+  const exportable=exportableProducts().length;
+  document.getElementById('stProducts').textContent=products.length.toLocaleString();
+  document.getElementById('stBrands').textContent=brandsWithCounts().length.toLocaleString();
+  document.getElementById('stSelected').textContent=selected.length.toLocaleString();
+  document.getElementById('stReady').textContent=ready.toLocaleString();
+  document.getElementById('stArabic').textContent=arabic.toLocaleString();
+  document.getElementById('stOk').textContent=ok.toLocaleString();
+  document.getElementById('stFailed').textContent=failed.toLocaleString();
+  document.getElementById('stExport').textContent=exportable.toLocaleString();
+  document.getElementById('brandNote').textContent=selectedBrands.size?`${selectedBrands.size.toLocaleString()} ماركة محددة`:'لا توجد ماركات محددة';
+  document.getElementById('scopeInfo').textContent=selectedBrands.size?`${selectedBrands.size.toLocaleString()} ماركة محددة`:'لا توجد ماركات محددة';
+  document.getElementById('translateBtn').disabled=!selectedBrands.size||!ready||translationRunning;
+  document.getElementById('retryBtn').disabled=!selectedBrands.size||!failed||translationRunning;
+  document.getElementById('downloadBtn').disabled=!exportable||translationRunning;
+}
+function filteredPreviewProducts(){
+  const q=document.getElementById('previewSearch').value.trim().toLowerCase();
+  const status=document.getElementById('statusFilter').value;
+  const option=document.getElementById('optionFilter').value;
+  return selectedProducts().filter(product=>{
+    const state=stateFor(product);
+    if(status!=='all'&&statusGroup(state.status)!==status)return false;
+    if(option==='with_options'&&!optionCount(product))return false;
+    if(option==='simple'&&optionCount(product))return false;
+    if(!q)return true;
+    return [textFor(product,'name'),textFor(product,'sku'),brandFor(product),state.reason,textFor(product,'description'),state.cleaned].join(' ').toLowerCase().includes(q);
+  });
+}
+function renderPreview(){
+  const body=document.getElementById('previewBody');
+  const empty=document.getElementById('emptyPreview');
+  const rows=filteredPreviewProducts();
+  document.getElementById('previewNote').textContent=selectedBrands.size
+    ? `${selectedProducts().length.toLocaleString()} منتج ضمن الماركات، ${rows.length.toLocaleString()} ظاهر بعد الفلاتر`
+    : 'لا توجد ماركات محددة';
+  if(!rows.length){body.innerHTML='';empty.style.display='block';return;}
+  empty.style.display='none';
+  body.innerHTML=rows.map((product,index)=>{
+    const state=stateFor(product);
+    const group=statusGroup(state.status);
+    const editorValue=state.cleaned||'';
+    return `<tr>
+      <td>${index+1}</td>
+      <td><span class="pill ${escapeHtml(group)}">${escapeHtml(statusLabel(state.status))}</span></td>
+      <td>${escapeHtml(brandFor(product))}</td>
+      <td>${escapeHtml(textFor(product,'name'))}</td>
+      <td dir="ltr">${escapeHtml(textFor(product,'sku'))}</td>
+      <td>${optionCount(product).toLocaleString()}</td>
+      <td class="description-cell">${escapeHtml(htmlToPlainText(textFor(product,'description')))}</td>
+      <td><textarea class="translated-editor" oninput="editTranslatedDescription('${escapeAttr(encodeURIComponent(product.key))}',this.value)" placeholder="الوصف العربي الجديد...">${escapeHtml(editorValue)}</textarea></td>
+      <td class="description-cell">${escapeHtml(state.reason||'')}</td>
+    </tr>`;
+  }).join('');
+}
+function refreshTranslationEligibility(){
+  if(translationRunning){logMsg('أوقف أو انتظر انتهاء دفعة الترجمة قبل تغيير حد الحروف');return;}
+  prepareTranslationStates();
+  updateStats();
+  renderPreview();
+}
+function editTranslatedDescription(encodedKey,value){
+  const key=decodeURIComponent(encodedKey);
+  const product=products.find(item=>item.key===key);
+  if(!product)return;
+  const previous=stateFor(product);
+  const cleaned=htmlToPlainText(value);
+  const local=validateTranslatedDescription(cleaned,previous.title||textFor(product,'name'));
+  translationStates.set(key,{
+    ...previous,
+    status:local.ok?'edited':'manual_invalid',
+    reason:local.ok?'تم تعديل الوصف يدوياً':'التعديل اليدوي غير صالح: '+local.reasons.join('، '),
+    cleaned
+  });
+  updateStats();
+}
+function translationProviderConfig(){
+  const provider=document.getElementById('translationProvider').value;
+  return TRANSLATION_PROVIDERS[provider]||TRANSLATION_PROVIDERS.deepseek;
+}
+function syncTranslationModelOptions(){
+  const provider=document.getElementById('translationProvider').value;
+  const select=document.getElementById('translationModel');
+  const current=select.value;
+  const models=TRANSLATION_MODELS[provider]||TRANSLATION_MODELS.deepseek;
+  select.innerHTML=models.map(model=>`<option value="${escapeHtml(model.value)}">${escapeHtml(model.label)}</option>`).join('');
+  select.value=models.some(model=>model.value===current)?current:models[0].value;
+}
+function translationModelName(){
+  syncTranslationModelOptions();
+  return document.getElementById('translationModel').value;
+}
+function parseJsonFromModel(text){
+  const raw=String(text??'').trim().replace(/^```(?:json)?/i,'').replace(/```$/,'').trim();
+  return JSON.parse(raw);
+}
+async function callTranslationApi(messages){
+  const key=document.getElementById('translationApiKey').value.trim();
+  if(!key)throw new Error('أدخل API Key أولا');
+  const config=translationProviderConfig();
+  const headers={'Content-Type':'application/json',Authorization:`Bearer ${key}`};
+  if(config.endpoint.includes('openrouter.ai')){
+    headers['HTTP-Referer']=location.href;
+    headers['X-Title']='Salla Description Translation';
+  }
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),TRANSLATION_API_TIMEOUT_MS);
+  try{
+    const response=await fetch(config.endpoint,{
+      method:'POST',
+      headers,
+      signal:controller.signal,
+      body:JSON.stringify({model:translationModelName(),response_format:{type:'json_object'},temperature:0.1,messages})
+    });
+    if(!response.ok)throw new Error(`API ${response.status}: ${await response.text()}`);
+    const data=await response.json();
+    return parseJsonFromModel(data.choices?.[0]?.message?.content||'{}');
+  }catch(error){
+    if(error.name==='AbortError')throw new Error('انتهت مهلة طلب الترجمة بعد 90 ثانية');
+    throw error;
+  }finally{
+    clearTimeout(timer);
+  }
+}
+async function reviewTranslations(source, translated, title){
+  return callTranslationApi([
+    {role:'system',content:'راجع ترجمة وصف منتج إلى العربية. أعد JSON فقط بالمفاتيح ok و cleaned و reasons. لا تقبل الترجمة المختصرة أو الملخصة؛ يجب أن تحافظ على كل التفاصيل والمعاني من المصدر. اسمح بأن تكون الصياغة العربية أوسع أو أجمل من الأصل إذا بقي المعنى محفوظاً، وكانت العبارات وصفية جذابة ومناسبة لمتجر عطور. ارفض أي مقدمات أو Markdown أو نجوم أو صينية أو كلام غير وصف المنتج.'},
+    {role:'user',content:JSON.stringify({title,source,translated})}
+  ]);
+}
+function validateTranslatedDescription(text, title){
+  const value=htmlToPlainText(text);
+  const reasons=[];
+  if(!value)reasons.push('الترجمة فارغة');
+  if(value.includes('*'))reasons.push('تحتوي على نجوم');
+  if(/[\u4E00-\u9FFF]/.test(value))reasons.push('تحتوي على كلمات صينية');
+  if(/```|<\/?code\b|^#+\s/m.test(value))reasons.push('تحتوي على Markdown أو كود');
+  if(/سوف أترجم|سأترجم|سوف اقوم|I will translate|Here is|Here\'s/i.test(value))reasons.push('تحتوي على مقدمة مساعد');
+  const normalized=comparableText(value), product=comparableText(title);
+  if(product&&(normalized===product||((product.includes(normalized)||normalized.includes(product))&&value.length<product.length+35))){
+    reasons.push('الترجمة تشبه اسم المنتج فقط');
+  }
+  return{ok:reasons.length===0,reasons};
+}
+async function translateProduct(product){
+  const state=stateFor(product);
+  const eligibility=isTranslatableDescription(state.source,textFor(product,'name'));
+  if(!eligibility.ok){
+    translationStates.set(product.key,{...state,status:eligibility.status,reason:eligibility.reason,cleaned:''});
+    return;
+  }
+  translationStates.set(product.key,{...state,status:'pending',reason:'قيد الترجمة',cleaned:''});
+  updateStats();renderPreview();
+  try{
+    const translated=await callTranslationApi([
+      {role:'system',content:'ترجم وصف المنتج من الإنجليزية إلى العربية لمتجر عطور. لا تختصر ولا تلخص ولا تحذف أي تفصيل من النص الأصلي؛ حافظ على كل التفاصيل والمعاني والفوائد والنبرة. اجعل الترجمة بصياغة عربية وصفية جذابة وغنية وسلسة، ويفضل أن تكون العبارات جميلة ومقنعة ما دامت لا تضيف ادعاءات غير موجودة. أعد JSON فقط بالمفتاح translated. لا تضف مقدمات أو تعليقات أو Markdown أو نجوم.'},
+      {role:'user',content:JSON.stringify({title:textFor(product,'name'),description:htmlToPlainText(state.source)})}
+    ]);
+    const reviewed=await reviewTranslations(state.source,translated.translated||'',textFor(product,'name'));
+    const cleaned=htmlToPlainText(reviewed.cleaned||translated.translated||'');
+    const local=validateTranslatedDescription(cleaned,textFor(product,'name'));
+    const reviewOk=reviewed.ok===true||String(reviewed.ok).toLowerCase()==='true';
+    if(reviewOk&&local.ok){
+      translationStates.set(product.key,{...state,status:'ok',reason:'تمت الترجمة والمراجعة',cleaned});
+    }else{
+      const reasons=[...(Array.isArray(reviewed.reasons)?reviewed.reasons:[reviewed.reasons].filter(Boolean)),...local.reasons];
+      translationStates.set(product.key,{...state,status:'failed',reason:reasons.join('، ')||'فشلت المراجعة',cleaned:''});
+    }
+  }catch(error){
+    translationStates.set(product.key,{...state,status:'failed',reason:error.message,cleaned:''});
+  }
+}
+function translationProductsForRun(filter){
+  return selectedProducts().filter(product=>{
+    const state=stateFor(product);
+    if(filter==='failed')return state.status==='failed';
+    return statusGroup(state.status)==='untranslated';
+  });
+}
+function setTranslationControls(){
+  document.getElementById('translateBtn').disabled=translationRunning||!selectedBrands.size||!eligibleProductsForSelectedBrands().length;
+  document.getElementById('retryBtn').disabled=translationRunning||!selectedBrands.size||!selectedProducts().some(product=>stateFor(product).status==='failed');
+  document.getElementById('pauseBtn').disabled=!translationRunning||translationPaused;
+  document.getElementById('resumeBtn').disabled=!translationRunning||!translationPaused;
+  document.getElementById('translationProvider').disabled=translationRunning;
+  document.getElementById('translationModel').disabled=translationRunning;
+  document.getElementById('translationApiKey').disabled=translationRunning;
+  document.getElementById('translationMinLength').disabled=translationRunning;
+}
+async function runTranslationQueue(){
+  const total=translationQueue.length;
+  while(translationQueueIndex<total){
+    if(translationPaused){
+      setTranslationControls();
+      logMsg(`تم إيقاف الترجمة مؤقتا عند ${translationQueueIndex.toLocaleString()} من ${total.toLocaleString()}`);
+      return;
+    }
+    setProgress(Math.round((translationQueueIndex/total)*90)+5);
+    if(translationQueueIndex===0||translationQueueIndex%10===0)logMsg(`قيد الترجمة: ${translationQueueIndex+1} من ${total}`);
+    await translateProduct(translationQueue[translationQueueIndex]);
+    translationQueueIndex++;
+    updateStats();renderPreview();
+  }
+  translationRunning=false;
+  translationPaused=false;
+  const finished=translationQueue.length;
+  translationQueue=[];
+  translationQueueIndex=0;
+  setTranslationControls();
+  updateStats();
+  setProgress(100);hideProgress();
+  logMsg(`انتهت ترجمة ومراجعة ${finished.toLocaleString()} وصف`);
+}
+async function translateDescriptions(filter='all'){
+  if(translationRunning){logMsg('هناك دفعة ترجمة قيد التنفيذ');return;}
+  if(!selectedBrands.size){logMsg('لا توجد ماركات محددة. اختر ماركة أو أكثر قبل الترجمة.');return;}
+  prepareTranslationStates();
+  translationQueue=translationProductsForRun(filter);
+  translationQueueIndex=0;
+  translationQueueFilter=filter;
+  if(!translationQueue.length){
+    logMsg(filter==='failed'?'لا توجد ترجمات فاشلة لإعادتها':'لا توجد أوصاف إنجليزية جاهزة للترجمة ضمن الماركات المحددة.');
+    updateStats();renderPreview();
+    return;
+  }
+  translationPaused=false;
+  translationRunning=true;
+  setTranslationControls();
+  logMsg(`بدأت ترجمة ومراجعة ${translationQueue.length.toLocaleString()} وصف إنجليزي فقط. حد الطول الحالي: أكثر من ${translationMinLength().toLocaleString()} حرف.`);
+  await runTranslationQueue();
+}
+async function retryFailedTranslations(){await translateDescriptions('failed');}
+function pauseTranslations(){
+  if(!translationRunning)return;
+  translationPaused=true;
+  setTranslationControls();
+  logMsg('سيتم إيقاف الترجمة بعد انتهاء الطلب الحالي');
+}
+async function resumeTranslations(){
+  if(!translationRunning||!translationPaused)return;
+  translationPaused=false;
+  setTranslationControls();
+  logMsg(`تم استئناف الترجمة (${translationQueueFilter==='failed'?'الفاشل فقط':'كل غير المترجم'})`);
+  await runTranslationQueue();
+}
+function cloneStyle(style){return style?JSON.parse(JSON.stringify(style)):{};}
+function captureRowStyle(worksheet,rowNumber){
+  const styles={};
+  worksheet.getRow(rowNumber).eachCell({includeEmpty:true},(cell,col)=>{styles[col]=cloneStyle(cell.style);});
+  return styles;
+}
+function applyStyle(row,styleTemplate){
+  row.eachCell({includeEmpty:true},(cell,col)=>{
+    if(styleTemplate[col])cell.style=cloneStyle(styleTemplate[col]);
+  });
+}
+function clearTemplateDataRows(worksheet){
+  const removeCount=Math.max(worksheet.rowCount-2,0);
+  if(removeCount>0)worksheet.spliceRows(3,removeCount);
+  if(Array.isArray(worksheet._rows))worksheet._rows=worksheet._rows.slice(0,2);
+}
+function addStyledRow(worksheet,values,style,height){
+  const row=worksheet.addRow(values);
+  row.height=height;
+  applyStyle(row,style);
+  return row;
+}
+async function downloadTranslatedDescriptions(){
+  try{
+    const exportProducts=exportableProducts();
+    if(!exportProducts.length){logMsg('لا توجد منتجات مترجمة أو معدلة صالحة للتصدير');return;}
+    setProgress(10);
+    const workbook=new ExcelJS.Workbook();
+    await workbook.xlsx.load(sallaBuffer);
+    const worksheet=workbook.worksheets[0];
+    const firstProduct=exportProducts[0];
+    const firstOption=exportProducts.find(product=>product.options.length)?.options[0]||firstProduct.options[0]||null;
+    const productStyle=captureRowStyle(worksheet,firstProduct.rowNumber);
+    const optionStyle=firstOption?captureRowStyle(worksheet,firstOption.rowNumber):productStyle;
+    const productHeight=worksheet.getRow(firstProduct.rowNumber).height;
+    const optionHeight=firstOption?worksheet.getRow(firstOption.rowNumber).height:productHeight;
+    clearTemplateDataRows(worksheet);
+    setProgress(35);
+    let outputRows=0;
+    for(const product of exportProducts){
+      const values=cloneRowValues(product);
+      setByHeader(values,'description',translatedValueForProduct(product));
+      setByHeader(values,'imageAlt',cleanImageAltText(textFor(product,'name')));
+      addStyledRow(worksheet,values,productStyle,productHeight);
+      outputRows++;
+      for(const option of product.options){
+        addStyledRow(worksheet,cloneRowValues(option),optionStyle,optionHeight);
+        outputRows++;
+      }
+    }
+    setProgress(75);
+    const buffer=await workbook.xlsx.writeBuffer();
+    const blob=new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const anchor=document.createElement('a');
+    anchor.href=URL.createObjectURL(blob);
+    anchor.download=`salla_translated_descriptions_${new Date().toISOString().slice(0,10)}.xlsx`;
+    anchor.click();
+    URL.revokeObjectURL(anchor.href);
+    setProgress(100);hideProgress();
+    logMsg(`تم تجهيز ملف الترجمة بعدد ${exportProducts.length.toLocaleString()} منتج و${outputRows.toLocaleString()} صف مع الخيارات`);
+  }catch(error){
+    hideProgress();
+    logMsg(`خطأ في التصدير: ${escapeHtml(error.message)}`);
+  }
+}
+syncTranslationModelOptions();
+</script>
+</body>
+</html>

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import vm from 'node:vm';
 
 const html = fs.readFileSync('new-products.html', 'utf8');
 
@@ -23,7 +24,9 @@ has(/excludedXlsOnlyRows/, 'page must report XLS-only SKUs excluded from export'
 has(/brandExactMap/, 'page must map XLS brands to exact Salla brand values');
 has(/brandArabicMap/, 'page must map XLS brands to Arabic product-name phrases');
 has(/brandFileExactMap/, 'page must map optional brand-file keys to Salla brand names');
+has(/brandFileArabicMap/, 'page must map optional brand-file keys to Arabic brand names for product titles');
 has(/function\s+brandFileKeysForRow/, 'page must derive brand-file matching keys from brand name and SEO URL');
+has(/function\s+brandFileArabicNameForRow/, 'page must extract Arabic brand names from optional brand-file rows');
 has(/id="brandFile"/, 'page must include an optional brand-file upload input');
 has(/id="brandFileInfo"/, 'page must show selected optional brand-file information');
 has(/function\s+sizeMl/, 'page must derive Arabic ml size values from Size/Type');
@@ -123,6 +126,40 @@ assert.ok(!/translationStatus|translationReason|translationLabel|translationActi
 assert.ok(/row\.cost\s*,\s*row\.sale\s*,\s*''\s*,\s*''\s*,\s*10000\s*,/.test(templateBody), 'templateRowArray must export 10000 for max quantity per customer');
 has(/function\s+previewExtraCells/, 'translation status/reasons must be rendered as preview-only cells');
 notHas(/templateFileObj/, 'template upload state must stay removed');
+has(/function\s+removeExtraWorksheets/, 'export must remove template helper worksheets before download');
+has(/workbook\.removeWorksheet\(workbook\.worksheets\[1\]\.id\)/, 'export must remove every worksheet after the first one');
+has(/const\s+removeCount\s*=\s*Math\.max\(worksheet\.rowCount-2,\s*0\)/, 'export must remove all template sample rows after the two header rows');
+has(/worksheet\.spliceRows\(3,\s*removeCount\)/, 'export must delete template sample rows starting at row 3');
+
+const productStyleIndex = html.indexOf('const productStyle=captureRowStyle(worksheet,3)');
+const optionStyleIndex = html.indexOf('const optionStyle=captureRowStyle(worksheet,4)');
+const spliceIndex = html.indexOf('worksheet.spliceRows(3,removeCount)');
+assert.ok(productStyleIndex > -1 && optionStyleIndex > -1 && spliceIndex > -1, 'export must capture template row styles and remove sample rows');
+assert.ok(productStyleIndex < spliceIndex && optionStyleIndex < spliceIndex, 'export must capture product and option styles before deleting template sample rows');
+
+const removeSheetsIndex = html.indexOf('removeExtraWorksheets(workbook)');
+const writeBufferIndex = html.indexOf('workbook.xlsx.writeBuffer()');
+assert.ok(removeSheetsIndex > -1 && writeBufferIndex > -1 && removeSheetsIndex < writeBufferIndex, 'export must remove extra worksheets before writing the XLSX file');
 
 const selectedRowsBody = html.match(/function\s+selectedRows\s*\(\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
 assert.ok(selectedRowsBody.includes('isBrandFileSelected'), 'selectedRows must include rows matched by the optional brand file');
+
+const brandFileArabicNameBody = html.match(/function\s+brandFileArabicNameForRow\s*\([^)]*\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
+assert.ok(/Page Description/.test(brandFileArabicNameBody) && /جميع\\s\+عطور/.test(brandFileArabicNameBody) && /الأصلية/.test(brandFileArabicNameBody), 'brand-file Arabic names must be extracted from the fixed page-description text');
+assert.ok(/Page Title/.test(brandFileArabicNameBody) && /replace\(\s*\/\^عطور\\s\+\//.test(brandFileArabicNameBody), 'brand-file Arabic names must fall back to the Arabic page title');
+assert.ok(/اسم الماركة/.test(brandFileArabicNameBody) && /function\s+firstArabicBrandPart/.test(html) && /\[-–—\|\/\]/.test(html), 'brand-file Arabic names must fall back to Arabic parts from the brand name');
+
+const pageScript = html.match(/<script>([\s\S]*)<\/script>/)?.[1] ?? '';
+const brandFileArabicExamples = vm.runInNewContext(`${pageScript}
+[
+  brandFileArabicNameForRow({'(Page Description) وصف صفحة العلامة التجارية':'جميع عطور نسك الأصلية اسعارنا مميزة','(Page Title) عنوان صفحة العلامة التجارية':'','اسم الماركة':'Nusuk'}),
+  brandFileArabicNameForRow({'(Page Description) وصف صفحة العلامة التجارية':'','(Page Title) عنوان صفحة العلامة التجارية':'عطور اديداس | عاطر','اسم الماركة':'Adidas'}),
+  brandFileArabicNameForRow({'(Page Description) وصف صفحة العلامة التجارية':'','(Page Title) عنوان صفحة العلامة التجارية':'','اسم الماركة':'عطور كلين'})
+]`);
+assert.deepEqual(Array.from(brandFileArabicExamples), ['نسك','اديداس','كلين'], 'brand-file Arabic extraction must cover Nusuk, Adidas, and Clean cases');
+
+const buildBrandFileMapBody = html.match(/function\s+buildBrandFileMap\s*\(\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
+assert.ok(buildBrandFileMapBody.includes('brandFileArabicMap'), 'buildBrandFileMap must populate the Arabic brand-file map');
+
+const arabicBrandForBody = html.match(/function\s+arabicBrandFor\s*\([^)]*\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
+assert.ok(arabicBrandForBody.includes('brandFileArabicMap'), 'arabicBrandFor must use Arabic names extracted from the optional brand file');
