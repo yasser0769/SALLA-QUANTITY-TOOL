@@ -99,6 +99,16 @@ has(/function\s+validateTranslatedDescription/, 'page must locally validate revi
 has(/function\s+retryFailedTranslations/, 'page must retry only failed translations');
 has(/function\s+pauseTranslations/, 'page must pause an active translation batch');
 has(/function\s+resumeTranslations/, 'page must resume a paused translation batch');
+has(/TRANSLATION_RESUME_STORAGE_KEY/, 'page must define a stable localStorage key for translation resume state');
+has(/function\s+translationResumeSnapshot/, 'page must serialize translation progress for resume after sleep/reload');
+has(/function\s+saveTranslationResumeState/, 'page must save translation progress to localStorage');
+has(/function\s+restoreTranslationResumeState/, 'page must restore translation progress from localStorage');
+has(/function\s+clearTranslationResumeState/, 'page must clear persisted translation progress after completion');
+has(/function\s+startPersistedTranslationResume/, 'page must start a saved translation batch from persisted progress');
+has(/localStorage\.setItem\(TRANSLATION_RESUME_STORAGE_KEY/, 'translation progress must be persisted with localStorage.setItem');
+has(/localStorage\.getItem\(TRANSLATION_RESUME_STORAGE_KEY/, 'translation progress must be loaded with localStorage.getItem');
+has(/localStorage\.removeItem\(TRANSLATION_RESUME_STORAGE_KEY/, 'translation progress must be removable from localStorage');
+has(/window\.addEventListener\(['"]beforeunload['"],\s*saveTranslationResumeState\)/, 'page must save translation progress before the page unloads');
 has(/function\s+translationMinLength/, 'page must read the editable description length threshold');
 has(/function\s+syncTranslationModelOptions/, 'page must sync model choices with the selected provider');
 has(/function\s+translationModelName/, 'page must send the selected model to the API');
@@ -163,3 +173,13 @@ assert.ok(buildBrandFileMapBody.includes('brandFileArabicMap'), 'buildBrandFileM
 
 const arabicBrandForBody = html.match(/function\s+arabicBrandFor\s*\([^)]*\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
 assert.ok(arabicBrandForBody.includes('brandFileArabicMap'), 'arabicBrandFor must use Arabic names extracted from the optional brand file');
+
+const translateGroupBody = html.match(/async\s+function\s+translateDescriptionGroup\s*\([^)]*\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
+assert.ok((translateGroupBody.match(/saveTranslationResumeState\(\)/g) ?? []).length >= 2, 'translateDescriptionGroup must persist pending and final translation states');
+
+const runQueueBody = html.match(/async\s+function\s+runTranslationQueue\s*\(\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
+assert.ok(runQueueBody.includes('saveTranslationResumeState()'), 'runTranslationQueue must persist queue index between products');
+assert.ok(runQueueBody.includes('clearTranslationResumeState()'), 'runTranslationQueue must clear persisted state after successful completion');
+
+const resumeBody = html.match(/async\s+function\s+resumeTranslations\s*\(\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
+assert.ok(resumeBody.includes('startPersistedTranslationResume'), 'resumeTranslations must support persisted resume when no in-memory queue is running');
