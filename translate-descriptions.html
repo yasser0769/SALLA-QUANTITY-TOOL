@@ -6,6 +6,7 @@
 <title>ترجمة أوصاف منتجات سلة</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <style>
 :root{
   --bg:#f6f8fb;--surface:#ffffff;--surface2:#f8fafc;--surface3:#eef2f7;
@@ -28,7 +29,7 @@ h1{font-size:clamp(1.55rem,3vw,2.1rem);font-weight:700;margin-bottom:8px}
 .note,.panel{background:linear-gradient(180deg,#ffffff,#f8fafc);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
 .note{border-inline-start:3px solid var(--accent);padding:17px 20px;margin-bottom:20px;font-size:.82rem;color:var(--text2);line-height:1.95}
 .note strong{color:var(--text)}
-.uploads{display:grid;grid-template-columns:minmax(240px,1fr) minmax(240px,1fr);gap:14px;margin-bottom:20px}
+.uploads{display:grid;grid-template-columns:repeat(3,minmax(220px,1fr));gap:14px;margin-bottom:20px}
 @media(max-width:760px){.uploads{grid-template-columns:1fr}}
 .upload-zone{background:linear-gradient(180deg,var(--surface2),var(--surface));border:1px dashed var(--border2);border-radius:var(--radius);padding:24px 18px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s,transform .2s,box-shadow .2s;min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .upload-zone:hover{border-color:var(--accent);background:#f0fdfa;transform:translateY(-2px);box-shadow:var(--shadow)}
@@ -60,7 +61,7 @@ h1{font-size:clamp(1.55rem,3vw,2.1rem);font-weight:700;margin-bottom:8px}
 .muted{color:var(--text3)}
 .search,.field input,.field select,.brand-sort{width:100%;padding:10px 12px;background:#ffffff;border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;outline:none;min-height:42px}
 .field label{display:block;font-size:.7rem;color:var(--text2);margin-bottom:5px;font-weight:700}
-.settings-grid{display:grid;grid-template-columns:minmax(140px,1fr) minmax(170px,1fr) minmax(120px,.7fr) minmax(230px,1.7fr);gap:10px;align-items:end;margin-bottom:12px}
+.settings-grid{display:grid;grid-template-columns:minmax(170px,1fr) minmax(120px,.7fr) minmax(230px,1.7fr);gap:10px;align-items:end;margin-bottom:12px}
 @media(max-width:900px){.settings-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:620px){.settings-grid{grid-template-columns:1fr}}
 .brand-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
@@ -103,7 +104,7 @@ tr:hover td{background:rgba(13,148,136,.055)}
   <header class="hdr">
     <div class="badge">SALLA DESCRIPTION TRANSLATION TOOL</div>
     <h1>ترجمة أوصاف منتجات سلة</h1>
-    <p>ارفع ملف منتجات سلة الكامل، اختر ماركة أو أكثر، ثم ترجم الأوصاف الإنجليزية فقط وصدّر ملفاً يحتوي المنتجات التي تمت ترجمتها مع خياراتها.</p>
+    <p>ارفع ملف منتجات سلة الكامل وملف المورد Shopify، ثم ترجم أوصاف Shopify المطابقة بالـ SKU فقط وصدّر ملف سلة يحتوي المنتجات التي تمت ترجمتها مع خياراتها.</p>
     <div class="top-links">
       <a href="index.html">الرجوع لتحديث الأسعار والكميات</a>
       <a href="new-products.html">صفحة المنتجات الجديدة</a>
@@ -112,7 +113,8 @@ tr:hover td{background:rgba(13,148,136,.055)}
   </header>
 
   <div class="note">
-    <strong>فلترة اللغة:</strong> لا تدخل الترجمة إلا الأوصاف الإنجليزية فقط. أي وصف يحتوي حروف عربية يعتبر مترجماً أو مختلطاً ويتم تخطيه.<br>
+    <strong>مصدر الوصف:</strong> كل الأوصاف التي تدخل الترجمة تؤخذ من ملف Shopify فقط عبر مطابقة SKU، وليس من وصف سلة الحالي.<br>
+    <strong>الأهلية:</strong> أي وصف Shopify أطول من 70 حرفاً يدخل كجاهز للترجمة حتى لو كان مختلطاً؛ الأقل من ذلك يظهر كغير صالح.<br>
     <strong>الماركات:</strong> لا توجد ماركات محددة افتراضياً؛ اختر ماركة أو أكثر قبل بدء الترجمة حتى لا تترجم منتجات غير مقصودة.<br>
     <strong>التصدير:</strong> الملف الناتج يحافظ على صيغة ملف سلة، ويحتوي فقط المنتجات التي تم ترجمة وصفها أو تعديلها بنجاح، ومعها خياراتها الأصلية إذا كانت موجودة.
   </div>
@@ -125,10 +127,17 @@ tr:hover td{background:rgba(13,148,136,.055)}
       <div class="sub">تصدير المنتجات الكامل من سلة</div>
       <div class="file-info" id="sallaInfo"></div>
     </div>
+    <div class="upload-zone" onclick="this.querySelector('input').click()" id="shopifyZone">
+      <input type="file" id="shopifyFile" accept=".csv" onchange="loadShopifyCsv(event)">
+      <div class="ico">CSV</div>
+      <h3>ملف المورد Shopify</h3>
+      <div class="sub">يحتوي Variant SKU و Body (HTML)</div>
+      <div class="file-info" id="shopifyInfo"></div>
+    </div>
     <div class="upload-zone">
-      <div class="ico">EN</div>
-      <h3>إنجليزي فقط</h3>
-      <div class="sub">الأوصاف العربية أو المختلطة يتم تخطيها تلقائياً</div>
+      <div class="ico">SKU</div>
+      <h3>مطابقة SKU فقط</h3>
+      <div class="sub">الوصف من Shopify فقط، والحد الافتراضي أكبر من 70 حرفاً</div>
       <div class="file-info" id="scopeInfo">لا توجد ماركات محددة</div>
     </div>
   </div>
@@ -150,7 +159,7 @@ tr:hover td{background:rgba(13,148,136,.055)}
     <div class="stat"><div class="n" id="stBrands">0</div><div class="l">ماركات</div></div>
     <div class="stat"><div class="n" id="stSelected" style="color:var(--accent)">0</div><div class="l">ضمن الماركات</div></div>
     <div class="stat"><div class="n" id="stReady" style="color:var(--violet)">0</div><div class="l">جاهز للترجمة</div></div>
-    <div class="stat"><div class="n" id="stArabic" style="color:var(--amber)">0</div><div class="l">متخطى عربي/مختلط</div></div>
+    <div class="stat"><div class="n" id="stSkipped" style="color:var(--amber)">0</div><div class="l">غير صالح/غير مطابق</div></div>
     <div class="stat"><div class="n" id="stOk" style="color:var(--green)">0</div><div class="l">مترجم/معدل</div></div>
     <div class="stat"><div class="n" id="stFailed" style="color:var(--red)">0</div><div class="l">فاشل</div></div>
     <div class="stat"><div class="n" id="stExport" style="color:var(--accent)">0</div><div class="l">جاهز للتصدير</div></div>
@@ -167,10 +176,12 @@ tr:hover td{background:rgba(13,148,136,.055)}
         <select class="brand-sort" id="brandSort" onchange="renderBrandChecks()" aria-label="ترتيب الماركات">
           <option value="name_asc">الاسم أ-ي</option>
           <option value="name_desc">الاسم ي-أ</option>
-          <option value="arabic_asc">الأخضر الأقل</option>
-          <option value="arabic_desc">الأخضر الأعلى</option>
           <option value="ready_asc">الأحمر الأقل</option>
           <option value="ready_desc">الأحمر الأعلى</option>
+          <option value="invalid_asc">غير صالح الأقل</option>
+          <option value="invalid_desc">غير صالح الأعلى</option>
+          <option value="missing_asc">غير مطابق الأقل</option>
+          <option value="missing_desc">غير مطابق الأعلى</option>
           <option value="total_asc">الأصفر الأقل</option>
           <option value="total_desc">الأصفر الأعلى</option>
         </select>
@@ -188,13 +199,6 @@ tr:hover td{background:rgba(13,148,136,.055)}
 
       <div class="settings-grid">
         <div class="field">
-          <label for="translationProvider">مزود API</label>
-          <select id="translationProvider" onchange="syncTranslationModelOptions()">
-            <option value="deepseek">DeepSeek</option>
-            <option value="openrouter">OpenRouter</option>
-          </select>
-        </div>
-        <div class="field">
           <label for="translationModel">الموديل</label>
           <select id="translationModel">
             <option value="deepseek-v4-flash">DeepSeek V4 Flash</option>
@@ -206,8 +210,8 @@ tr:hover td{background:rgba(13,148,136,.055)}
           <input id="translationMinLength" type="number" min="0" step="1" value="70" oninput="refreshTranslationEligibility()">
         </div>
         <div class="field">
-          <label for="translationApiKey">API Key</label>
-          <input id="translationApiKey" type="password" autocomplete="off" placeholder="sk-...">
+          <label for="translationAccessToken">رمز الدخول</label>
+          <input id="translationAccessToken" type="password" autocomplete="off" placeholder="رمز Vercel للترجمة">
         </div>
       </div>
 
@@ -243,24 +247,10 @@ tr:hover td{background:rgba(13,148,136,.055)}
 </main>
 
 <script>
-let sallaFile=null, sallaBuffer=null, sallaWorkbook=null, sallaWorksheet=null;
-let headerMap={}, headerList=[], products=[], selectedBrands=new Set(), translationStates=new Map();
+let sallaFile=null, shopifyFile=null, sallaBuffer=null, sallaWorkbook=null, sallaWorksheet=null;
+let headerMap={}, headerList=[], products=[], selectedBrands=new Set(), translationStates=new Map(), shopifyDescriptionsBySku=new Map();
 let translationRunning=false, translationPaused=false, translationQueue=[], translationQueueIndex=0, translationQueueFilter='all';
 const TRANSLATION_API_TIMEOUT_MS=90000;
-const TRANSLATION_PROVIDERS={
-  deepseek:{endpoint:'https://api.deepseek.com/chat/completions'},
-  openrouter:{endpoint:'https://openrouter.ai/api/v1/chat/completions'}
-};
-const TRANSLATION_MODELS={
-  deepseek:[
-    {value:'deepseek-v4-flash',label:'DeepSeek V4 Flash'},
-    {value:'deepseek-v4-pro',label:'DeepSeek V4 Pro'}
-  ],
-  openrouter:[
-    {value:'deepseek/deepseek-v4-pro',label:'DeepSeek V4 Pro عبر OpenRouter'},
-    {value:'deepseek/deepseek-chat',label:'DeepSeek Chat عبر OpenRouter'}
-  ]
-};
 const HEADER_ALIASES={
   type:['النوع','النوع '],
   name:['أسم المنتج','اسم المنتج'],
@@ -351,27 +341,10 @@ function translationMinLength(){
   const value=Number(input?.value);
   return Number.isFinite(value)&&value>=0?Math.floor(value):70;
 }
-function isEnglishOnlyDescription(description){
+function isTranslatableDescription(description, minLength=translationMinLength()){
   const plain=htmlToPlainText(description);
-  if(!plain)return{ok:false,reason:'الوصف فارغ'};
-  if(/[\u0600-\u06FF]/.test(plain))return{ok:false,reason:'الوصف يحتوي حروف عربية، لذلك يعتبر مترجماً أو مختلطاً'};
-  const letters=plain.match(/\p{Letter}/gu)||[];
-  const latin=plain.match(/\p{Script=Latin}/gu)||[];
-  const latinRatio=letters.length?latin.length/letters.length:0;
-  if(latin.length<20||latinRatio<0.75)return{ok:false,reason:'الوصف ليس إنجليزياً بشكل كاف'};
-  return{ok:true,reason:''};
-}
-function isTranslatableDescription(description, productTitle, minLength=translationMinLength()){
-  const plain=htmlToPlainText(description);
-  if(!plain)return{ok:false,status:'skipped_empty',reason:'الوصف فارغ'};
-  if(plain.length<=minLength)return{ok:false,status:'skipped_short',reason:`الوصف ${plain.length.toLocaleString()} حرف، لا يتجاوز حد الترجمة (${minLength.toLocaleString()})`};
-  const english=isEnglishOnlyDescription(description);
-  if(!english.ok)return{ok:false,status:'skipped_arabic_or_mixed',reason:english.reason};
-  const normalized=comparableText(plain);
-  const title=comparableText(productTitle);
-  if(title&&(normalized===title||((title.includes(normalized)||normalized.includes(title))&&plain.length<title.length+35))){
-    return{ok:false,status:'skipped_name_only',reason:'الوصف مطابق لاسم المنتج تقريبا'};
-  }
+  if(!plain)return{ok:false,status:'skipped_missing_source',reason:'لا يوجد وصف Shopify مطابق لهذا SKU'};
+  if(plain.length<=minLength)return{ok:false,status:'skipped_short',reason:`غير صالح: وصف Shopify ${plain.length.toLocaleString()} حرف، لا يتجاوز حد الترجمة (${minLength.toLocaleString()})`};
   return{ok:true,status:'ready',reason:''};
 }
 function statusGroup(status){
@@ -386,6 +359,8 @@ function statusLabel(status){
   if(value==='edited')return'معدل';
   if(value==='failed')return'فاشل';
   if(value==='pending')return'قيد التنفيذ';
+  if(status==='skipped_short')return'غير صالح';
+  if(status==='skipped_missing_source')return'غير مطابق';
   if(value==='skipped')return'متخطى';
   return'جاهز';
 }
@@ -393,7 +368,7 @@ function productKey(product){
   return `${product.rowNumber}|${textFor(product,'sku')}|${textFor(product,'name')}`;
 }
 function stateFor(product){
-  return translationStates.get(product.key)||{status:'untranslated',reason:'جاهز للترجمة',cleaned:'',source:textFor(product,'description'),title:textFor(product,'name')};
+  return translationStates.get(product.key)||{status:'untranslated',reason:'جاهز للترجمة',cleaned:'',source:'',sourceSku:'',title:textFor(product,'name')};
 }
 function translatedValueForProduct(product){
   const state=stateFor(product);
@@ -413,6 +388,7 @@ function exportableProducts(){
 }
 function optionCount(product){return product.options.length;}
 function readArrayBuffer(file){return file.arrayBuffer();}
+function checkReady(){document.getElementById('analyzeBtn').disabled=!(sallaFile&&shopifyFile);}
 async function loadSallaProducts(event){
   sallaFile=event.target.files[0];if(!sallaFile)return;
   resetAnalysisState();
@@ -422,7 +398,48 @@ async function loadSallaProducts(event){
   sallaWorksheet=sallaWorkbook.worksheets[0];
   document.getElementById('sallaZone').classList.add('ok');
   document.getElementById('sallaInfo').textContent=`تم اختيار ${sallaFile.name}`;
-  document.getElementById('analyzeBtn').disabled=false;
+  checkReady();
+}
+async function loadShopifyCsv(event){
+  shopifyFile=event.target.files[0];if(!shopifyFile)return;
+  resetAnalysisState();
+  shopifyDescriptionsBySku=new Map();
+  document.getElementById('shopifyZone').classList.add('ok');
+  document.getElementById('shopifyInfo').textContent=`تم اختيار ${shopifyFile.name}`;
+  checkReady();
+}
+async function readShopifyDescriptionsBySku(){
+  const text=await shopifyFile.text();
+  const parsed=Papa.parse(text,{header:true,skipEmptyLines:true});
+  if(parsed.errors?.length)throw new Error(parsed.errors[0].message);
+  shopifyDescriptionsBySku=new Map();
+  for(const row of parsed.data){
+    const sku=cleanSku(row['Variant SKU']);
+    const body=row['Body (HTML)']||'';
+    if(!sku||!htmlToPlainText(body))continue;
+    if(!shopifyDescriptionsBySku.has(sku)){
+      shopifyDescriptionsBySku.set(sku,{sku,description:body,handle:cleanText(row.Handle),title:cleanText(row.Title),vendor:cleanText(row.Vendor)});
+    }
+  }
+  if(!shopifyDescriptionsBySku.size)throw new Error('لم أجد أوصاف Shopify صالحة عبر Variant SKU و Body (HTML)');
+}
+function sourceDescriptionForProduct(product){
+  const productSku=cleanSku(textFor(product,'sku'));
+  if(productSku&&shopifyDescriptionsBySku.has(productSku)){
+    const source=shopifyDescriptionsBySku.get(productSku);
+    return{...source,reason:`مصدر الوصف من SKU المنتج ${source.sku}`};
+  }
+  if(productSku)return{description:'',sku:productSku,reason:`لا يوجد وصف Shopify مطابق لـ SKU المنتج ${productSku}`};
+  const matched=[];
+  for(const option of product.options){
+    const optionSku=cleanSku(textFor(option,'sku'));
+    if(optionSku&&shopifyDescriptionsBySku.has(optionSku))matched.push(shopifyDescriptionsBySku.get(optionSku));
+  }
+  if(!matched.length)return{description:'',sku:'',reason:'لا يوجد SKU منتج أو خيار مطابق في Shopify'};
+  const first=matched[0];
+  const uniqueDescriptions=[...new Set(matched.map(item=>htmlToPlainText(item.description)))];
+  const warning=uniqueDescriptions.length>1?'، تنبيه: توجد أوصاف مختلفة بين خيارات المنتج وتم استخدام أول SKU مطابق حسب ترتيب سلة':'';
+  return{...first,reason:`مصدر الوصف من أول SKU خيار مطابق ${first.sku}${warning}`};
 }
 function readSallaCatalogWorkbook(){
   headerMap={};headerList=[];products=[];translationStates=new Map();selectedBrands=new Set();
@@ -467,13 +484,16 @@ function prepareTranslationStates(){
   for(const product of products){
     const existing=translationStates.get(product.key);
     if(existing&&['ok','edited','failed','pending'].includes(existing.status))continue;
-    const source=textFor(product,'description');
+    const sourceInfo=sourceDescriptionForProduct(product);
+    const source=sourceInfo.description||'';
     const title=textFor(product,'name');
-    const eligibility=isTranslatableDescription(source,title);
+    const eligibility=isTranslatableDescription(source);
     translationStates.set(product.key,{
       status:eligibility.ok?'untranslated':eligibility.status,
-      reason:eligibility.ok?'جاهز للترجمة':eligibility.reason,
+      reason:eligibility.ok?`جاهز للترجمة: ${sourceInfo.reason}`:eligibility.reason,
       source,
+      sourceSku:sourceInfo.sku||'',
+      sourceReason:sourceInfo.reason||'',
       title,
       cleaned:existing?.cleaned||''
     });
@@ -483,12 +503,18 @@ function brandSummaryEntries(){
   const summaries=new Map();
   for(const product of products){
     const brand=brandFor(product);
-    if(!summaries.has(brand))summaries.set(brand,{brand,total:0,arabic:0,ready:0});
+    if(!summaries.has(brand))summaries.set(brand,{brand,total:0,ready:0,failed:0,invalid:0,missing:0,translated:0,completed:false});
     const summary=summaries.get(brand);
     const state=stateFor(product);
     summary.total++;
-    if(state.status==='skipped_arabic_or_mixed')summary.arabic++;
     if(statusGroup(state.status)==='untranslated')summary.ready++;
+    if(state.status==='failed'||state.status==='manual_invalid')summary.failed++;
+    if(state.status==='skipped_short')summary.invalid++;
+    if(state.status==='skipped_missing_source')summary.missing++;
+    if(state.status==='ok'||state.status==='edited')summary.translated++;
+  }
+  for(const summary of summaries.values()){
+    summary.completed=summary.translated>0&&summary.ready===0&&summary.failed===0;
   }
   return [...summaries.values()];
 }
@@ -499,10 +525,12 @@ function compareBrandSummaries(a,b,sortValue){
     return direction==='asc'?(diff||nameCompare):(-diff||nameCompare);
   };
   if(sortValue==='name_desc')return b.brand.localeCompare(a.brand);
-  if(sortValue==='arabic_asc')return compareCount('arabic','asc');
-  if(sortValue==='arabic_desc')return compareCount('arabic','desc');
   if(sortValue==='ready_asc')return compareCount('ready','asc');
   if(sortValue==='ready_desc')return compareCount('ready','desc');
+  if(sortValue==='invalid_asc')return compareCount('invalid','asc');
+  if(sortValue==='invalid_desc')return compareCount('invalid','desc');
+  if(sortValue==='missing_asc')return compareCount('missing','asc');
+  if(sortValue==='missing_desc')return compareCount('missing','desc');
   if(sortValue==='total_asc')return compareCount('total','asc');
   if(sortValue==='total_desc')return compareCount('total','desc');
   return nameCompare;
@@ -519,12 +547,14 @@ function visibleBrandEntries(){
 }
 function renderBrandChecks(){
   const body=document.getElementById('brandChecks');
-  body.innerHTML=visibleBrandEntries().map(({brand,total,arabic,ready})=>`
+  body.innerHTML=visibleBrandEntries().map(({brand,total,ready,failed,invalid,missing,completed})=>`
     <div class="brand-item">
       <label><input type="checkbox" ${selectedBrands.has(brand)?'checked':''} onchange="toggleBrand('${escapeAttr(encodeURIComponent(brand))}',this.checked)"><span class="brand-name">${escapeHtml(brand)}</span></label>
       <span class="brand-counts" aria-label="إحصائيات الماركة">
-        <span class="brand-count green" title="عربي/مختلط">عربي ${arabic.toLocaleString()}</span>
-        <span class="brand-count red" title="جاهز للترجمة">جاهز ${ready.toLocaleString()}</span>
+        <span class="brand-count green" title="اكتمال ترجمة البراند">${completed?'مكتمل':'غير مكتمل'}</span>
+        <span class="brand-count red" title="جاهز أو فاشل">${(ready+failed).toLocaleString()} متبقي</span>
+        <span class="brand-count amber" title="غير صالح أقل من الحد">غير صالح ${invalid.toLocaleString()}</span>
+        <span class="brand-count amber" title="غير مطابق في Shopify">غير مطابق ${missing.toLocaleString()}</span>
         <span class="brand-count amber" title="إجمالي المنتجات">إجمالي ${total.toLocaleString()}</span>
       </span>
     </div>
@@ -552,7 +582,9 @@ async function analyzeDescriptions(){
     document.getElementById('logBox').innerHTML='';
     setProgress(10);
     readSallaCatalogWorkbook();
-    setProgress(45);
+    setProgress(35);
+    await readShopifyDescriptionsBySku();
+    setProgress(55);
     prepareTranslationStates();
     setProgress(75);
     document.getElementById('brandPanel').classList.add('on');
@@ -562,7 +594,7 @@ async function analyzeDescriptions(){
     updateStats();
     renderPreview();
     setProgress(100);hideProgress();
-    logMsg(`تم تحليل ${products.length.toLocaleString()} منتج. اختر ماركة أو أكثر للترجمة.`);
+    logMsg(`تم تحليل ${products.length.toLocaleString()} منتج و${shopifyDescriptionsBySku.size.toLocaleString()} وصف Shopify حسب SKU. اختر ماركة أو أكثر للترجمة.`);
   }catch(error){
     hideProgress();
     logMsg(`خطأ: ${escapeHtml(error.message)}`);
@@ -572,7 +604,7 @@ function updateStats(){
   const selected=selectedProducts();
   const states=selected.map(stateFor);
   const ready=states.filter(state=>statusGroup(state.status)==='untranslated').length;
-  const arabic=states.filter(state=>state.status==='skipped_arabic_or_mixed').length;
+  const skipped=states.filter(state=>state.status==='skipped_short'||state.status==='skipped_missing_source').length;
   const ok=states.filter(state=>state.status==='ok'||state.status==='edited').length;
   const failed=states.filter(state=>state.status==='failed').length;
   const exportable=exportableProducts().length;
@@ -580,7 +612,7 @@ function updateStats(){
   document.getElementById('stBrands').textContent=brandsWithCounts().length.toLocaleString();
   document.getElementById('stSelected').textContent=selected.length.toLocaleString();
   document.getElementById('stReady').textContent=ready.toLocaleString();
-  document.getElementById('stArabic').textContent=arabic.toLocaleString();
+  document.getElementById('stSkipped').textContent=skipped.toLocaleString();
   document.getElementById('stOk').textContent=ok.toLocaleString();
   document.getElementById('stFailed').textContent=failed.toLocaleString();
   document.getElementById('stExport').textContent=exportable.toLocaleString();
@@ -601,7 +633,7 @@ function filteredPreviewProducts(){
     if(option==='with_options'&&!optionCount(product))return false;
     if(option==='simple'&&optionCount(product))return false;
     if(!q)return true;
-    return [textFor(product,'name'),textFor(product,'sku'),brandFor(product),state.reason,textFor(product,'description'),state.cleaned].join(' ').toLowerCase().includes(q);
+    return [textFor(product,'name'),textFor(product,'sku'),brandFor(product),state.sourceSku,state.reason,state.source,state.cleaned].join(' ').toLowerCase().includes(q);
   });
 }
 function renderPreview(){
@@ -624,7 +656,7 @@ function renderPreview(){
       <td>${escapeHtml(textFor(product,'name'))}</td>
       <td dir="ltr">${escapeHtml(textFor(product,'sku'))}</td>
       <td>${optionCount(product).toLocaleString()}</td>
-      <td class="description-cell">${escapeHtml(htmlToPlainText(textFor(product,'description')))}</td>
+      <td class="description-cell">${escapeHtml(htmlToPlainText(state.source))}</td>
       <td><textarea class="translated-editor" oninput="editTranslatedDescription('${escapeAttr(encodeURIComponent(product.key))}',this.value)" placeholder="الوصف العربي الجديد...">${escapeHtml(editorValue)}</textarea></td>
       <td class="description-cell">${escapeHtml(state.reason||'')}</td>
     </tr>`;
@@ -651,47 +683,34 @@ function editTranslatedDescription(encodedKey,value){
   });
   updateStats();
 }
-function translationProviderConfig(){
-  const provider=document.getElementById('translationProvider').value;
-  return TRANSLATION_PROVIDERS[provider]||TRANSLATION_PROVIDERS.deepseek;
-}
 function syncTranslationModelOptions(){
-  const provider=document.getElementById('translationProvider').value;
   const select=document.getElementById('translationModel');
   const current=select.value;
-  const models=TRANSLATION_MODELS[provider]||TRANSLATION_MODELS.deepseek;
-  select.innerHTML=models.map(model=>`<option value="${escapeHtml(model.value)}">${escapeHtml(model.label)}</option>`).join('');
+  const models=[
+    {value:'deepseek-v4-flash',label:'DeepSeek V4 Flash'},
+    {value:'deepseek-v4-pro',label:'DeepSeek V4 Pro'}
+  ];
+  if(!select.options.length)select.innerHTML=models.map(model=>`<option value="${escapeHtml(model.value)}">${escapeHtml(model.label)}</option>`).join('');
   select.value=models.some(model=>model.value===current)?current:models[0].value;
 }
 function translationModelName(){
   syncTranslationModelOptions();
   return document.getElementById('translationModel').value;
 }
-function parseJsonFromModel(text){
-  const raw=String(text??'').trim().replace(/^```(?:json)?/i,'').replace(/```$/,'').trim();
-  return JSON.parse(raw);
-}
-async function callTranslationApi(messages){
-  const key=document.getElementById('translationApiKey').value.trim();
-  if(!key)throw new Error('أدخل API Key أولا');
-  const config=translationProviderConfig();
-  const headers={'Content-Type':'application/json',Authorization:`Bearer ${key}`};
-  if(config.endpoint.includes('openrouter.ai')){
-    headers['HTTP-Referer']=location.href;
-    headers['X-Title']='Salla Description Translation';
-  }
+async function callTranslationApi(operation,messages){
+  const accessToken=document.getElementById('translationAccessToken').value.trim();
+  if(!accessToken)throw new Error('أدخل رمز الدخول أولا');
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),TRANSLATION_API_TIMEOUT_MS);
   try{
-    const response=await fetch(config.endpoint,{
+    const response=await fetch('/api/translate-description',{
       method:'POST',
-      headers,
+      headers:{'Content-Type':'application/json','X-Translation-Access-Token':accessToken},
       signal:controller.signal,
-      body:JSON.stringify({model:translationModelName(),response_format:{type:'json_object'},temperature:0.1,messages})
+      body:JSON.stringify({operation,model:translationModelName(),messages})
     });
     if(!response.ok)throw new Error(`API ${response.status}: ${await response.text()}`);
-    const data=await response.json();
-    return parseJsonFromModel(data.choices?.[0]?.message?.content||'{}');
+    return response.json();
   }catch(error){
     if(error.name==='AbortError')throw new Error('انتهت مهلة طلب الترجمة بعد 90 ثانية');
     throw error;
@@ -700,7 +719,7 @@ async function callTranslationApi(messages){
   }
 }
 async function reviewTranslations(source, translated, title){
-  return callTranslationApi([
+  return callTranslationApi('review',[
     {role:'system',content:'راجع ترجمة وصف منتج إلى العربية. أعد JSON فقط بالمفاتيح ok و cleaned و reasons. لا تقبل الترجمة المختصرة أو الملخصة؛ يجب أن تحافظ على كل التفاصيل والمعاني من المصدر. اسمح بأن تكون الصياغة العربية أوسع أو أجمل من الأصل إذا بقي المعنى محفوظاً، وكانت العبارات وصفية جذابة ومناسبة لمتجر عطور. ارفض أي مقدمات أو Markdown أو نجوم أو صينية أو كلام غير وصف المنتج.'},
     {role:'user',content:JSON.stringify({title,source,translated})}
   ]);
@@ -721,7 +740,7 @@ function validateTranslatedDescription(text, title){
 }
 async function translateProduct(product){
   const state=stateFor(product);
-  const eligibility=isTranslatableDescription(state.source,textFor(product,'name'));
+  const eligibility=isTranslatableDescription(state.source);
   if(!eligibility.ok){
     translationStates.set(product.key,{...state,status:eligibility.status,reason:eligibility.reason,cleaned:''});
     return;
@@ -729,7 +748,7 @@ async function translateProduct(product){
   translationStates.set(product.key,{...state,status:'pending',reason:'قيد الترجمة',cleaned:''});
   updateStats();renderPreview();
   try{
-    const translated=await callTranslationApi([
+    const translated=await callTranslationApi('translate',[
       {role:'system',content:'ترجم وصف المنتج من الإنجليزية إلى العربية لمتجر عطور. لا تختصر ولا تلخص ولا تحذف أي تفصيل من النص الأصلي؛ حافظ على كل التفاصيل والمعاني والفوائد والنبرة. اجعل الترجمة بصياغة عربية وصفية جذابة وغنية وسلسة، ويفضل أن تكون العبارات جميلة ومقنعة ما دامت لا تضيف ادعاءات غير موجودة. أعد JSON فقط بالمفتاح translated. لا تضف مقدمات أو تعليقات أو Markdown أو نجوم.'},
       {role:'user',content:JSON.stringify({title:textFor(product,'name'),description:htmlToPlainText(state.source)})}
     ]);
@@ -759,9 +778,8 @@ function setTranslationControls(){
   document.getElementById('retryBtn').disabled=translationRunning||!selectedBrands.size||!selectedProducts().some(product=>stateFor(product).status==='failed');
   document.getElementById('pauseBtn').disabled=!translationRunning||translationPaused;
   document.getElementById('resumeBtn').disabled=!translationRunning||!translationPaused;
-  document.getElementById('translationProvider').disabled=translationRunning;
   document.getElementById('translationModel').disabled=translationRunning;
-  document.getElementById('translationApiKey').disabled=translationRunning;
+  document.getElementById('translationAccessToken').disabled=translationRunning;
   document.getElementById('translationMinLength').disabled=translationRunning;
 }
 async function runTranslationQueue(){
