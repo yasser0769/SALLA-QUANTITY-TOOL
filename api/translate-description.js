@@ -1,6 +1,6 @@
 const DEEPSEEK_ENDPOINT = 'https://api.deepseek.com/chat/completions';
 const ALLOWED_MODELS = new Set(['deepseek-v4-flash', 'deepseek-v4-pro']);
-const ALLOWED_OPERATIONS = new Set(['translate', 'review']);
+const ALLOWED_OPERATIONS = new Set(['translate', 'review', 'health']);
 
 function sendJson(response, statusCode, payload) {
   response.statusCode = statusCode;
@@ -25,10 +25,19 @@ function readRequestBody(request) {
 
 function parseJsonFromModel(text) {
   const raw = String(text ?? '').trim().replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim();
-  return JSON.parse(raw || '{}');
+  if (!raw) throw new Error('DeepSeek returned empty JSON content');
+  return JSON.parse(raw);
 }
 
 module.exports = async function handler(request, response) {
+  if (request.method === 'GET') {
+    return sendJson(response, 200, {
+      ok: true,
+      deepseekConfigured: Boolean(process.env.DEEPSEEK_API_KEY),
+      accessTokenConfigured: Boolean(process.env.TRANSLATION_ACCESS_TOKEN)
+    });
+  }
+
   if (request.method !== 'POST') {
     response.setHeader('Allow', 'POST');
     return sendJson(response, 405, { error: 'Method not allowed' });
@@ -37,12 +46,12 @@ module.exports = async function handler(request, response) {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   const accessToken = process.env.TRANSLATION_ACCESS_TOKEN;
 
-  if (!apiKey || !accessToken) {
-    return sendJson(response, 500, { error: 'Translation service is not configured' });
+  if (!apiKey) {
+    return sendJson(response, 500, { error: 'DEEPSEEK_API_KEY is not configured in Vercel' });
   }
 
   const providedToken = request.headers['x-translation-access-token'];
-  if (providedToken !== accessToken) {
+  if (accessToken && providedToken !== accessToken) {
     return sendJson(response, 401, { error: 'Invalid translation access token' });
   }
 
@@ -63,11 +72,17 @@ module.exports = async function handler(request, response) {
   if (!ALLOWED_MODELS.has(model)) {
     return sendJson(response, 400, { error: 'Unsupported DeepSeek model' });
   }
-  if (!messages.length) {
+  if (operation !== 'health' && !messages.length) {
     return sendJson(response, 400, { error: 'Messages are required' });
   }
 
   try {
+    const requestMessages = operation === 'health'
+      ? [
+          { role: 'system', content: 'Return JSON only. Example JSON output: {"ok":true}' },
+          { role: 'user', content: 'Return {"ok":true} as JSON.' }
+        ]
+      : messages;
     const upstream = await fetch(DEEPSEEK_ENDPOINT, {
       method: 'POST',
       headers: {
@@ -77,8 +92,11 @@ module.exports = async function handler(request, response) {
       body: JSON.stringify({
         model,
         response_format: { type: 'json_object' },
+        thinking: { type: 'disabled' },
+        stream: false,
+        max_tokens: operation === 'translate' ? 4096 : 1024,
         temperature: operation === 'translate' ? 0.1 : 0,
-        messages
+        messages: requestMessages
       })
     });
 
@@ -87,7 +105,15 @@ module.exports = async function handler(request, response) {
     }
 
     const data = await upstream.json();
-    return sendJson(response, 200, parseJsonFromModel(data.choices?.[0]?.message?.content || '{}'));
+    const parsed = parseJsonFromModel(data.choices?.[0]?.message?.content || '');
+    if (operation === 'health') {
+      return sendJson(response, 200, {
+        ok: parsed.ok === true,
+        deepseekConfigured: true,
+        accessTokenConfigured: Boolean(accessToken)
+      });
+    }
+    return sendJson(response, 200, parsed);
   } catch (error) {
     return sendJson(response, 500, { error: error.message || 'Translation request failed' });
   }

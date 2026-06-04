@@ -144,6 +144,7 @@ tr:hover td{background:rgba(13,148,136,.055)}
 
   <div class="actions">
     <button class="btn primary" id="analyzeBtn" disabled onclick="analyzeDescriptions()">تحليل الأوصاف</button>
+    <button class="btn" id="testConnectionBtn" onclick="testTranslationConnectionFromButton()">اختبار الاتصال</button>
     <button class="btn primary" id="translateBtn" disabled onclick="translateDescriptions()">ترجمة الأوصاف المختارة</button>
     <button class="btn" id="retryBtn" disabled onclick="retryFailedTranslations()">إعادة ترجمة الفاشل</button>
     <button class="btn" id="pauseBtn" disabled onclick="pauseTranslations()">إيقاف مؤقت</button>
@@ -699,7 +700,6 @@ function translationModelName(){
 }
 async function callTranslationApi(operation,messages){
   const accessToken=document.getElementById('translationAccessToken').value.trim();
-  if(!accessToken)throw new Error('أدخل رمز الدخول أولا');
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),TRANSLATION_API_TIMEOUT_MS);
   try{
@@ -709,13 +709,40 @@ async function callTranslationApi(operation,messages){
       signal:controller.signal,
       body:JSON.stringify({operation,model:translationModelName(),messages})
     });
-    if(!response.ok)throw new Error(`API ${response.status}: ${await response.text()}`);
+    if(!response.ok)throw new Error(`API ${response.status}: ${await parseTranslationApiError(response)}`);
     return response.json();
   }catch(error){
     if(error.name==='AbortError')throw new Error('انتهت مهلة طلب الترجمة بعد 90 ثانية');
     throw error;
   }finally{
     clearTimeout(timer);
+  }
+}
+async function parseTranslationApiError(response){
+  const text=await response.text();
+  try{
+    const parsed=JSON.parse(text);
+    return parsed.error||text;
+  }catch(error){
+    return text;
+  }
+}
+async function testTranslationConnection(){
+  const result=await callTranslationApi('health',[
+    {role:'system',content:'Return JSON only. Example JSON output: {"ok":true}'},
+    {role:'user',content:'Return {"ok":true} as JSON.'}
+  ]);
+  if(result.ok!==true)throw new Error('فشل اختبار DeepSeek: لم يرجع ok=true');
+  return result;
+}
+async function testTranslationConnectionFromButton(){
+  try{
+    const result=await testTranslationConnection();
+    logMsg(result.accessTokenConfigured===false
+      ? 'نجح اختبار DeepSeek. تنبيه: رمز الدخول غير مفعل في Vercel، لذلك الحماية غير مفعلة حالياً.'
+      : 'نجح اختبار DeepSeek ورمز الدخول صحيح.');
+  }catch(error){
+    logMsg(`فشل اختبار الاتصال: ${escapeHtml(error.message)}`);
   }
 }
 async function reviewTranslations(source, translated, title){
@@ -816,6 +843,12 @@ async function translateDescriptions(filter='all'){
   if(!translationQueue.length){
     logMsg(filter==='failed'?'لا توجد ترجمات فاشلة لإعادتها':'لا توجد أوصاف إنجليزية جاهزة للترجمة ضمن الماركات المحددة.');
     updateStats();renderPreview();
+    return;
+  }
+  try{
+    await testTranslationConnection();
+  }catch(error){
+    logMsg(`توقف قبل بدء الدفعة: فشل اختبار الاتصال بـ Vercel/DeepSeek: ${escapeHtml(error.message)}`);
     return;
   }
   translationPaused=false;

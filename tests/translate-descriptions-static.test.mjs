@@ -79,6 +79,10 @@ notHas(/https:\/\/openrouter\.ai\/api\/v1\/chat\/completions/, 'OpenRouter endpo
 notHas(/deepseek\/deepseek-v4-pro/, 'OpenRouter model names must not be used by the Shopify-sourced translation page');
 has(/AbortController/, 'translation API calls must be abortable');
 has(/TRANSLATION_API_TIMEOUT_MS/, 'translation API calls must have a clear timeout');
+has(/function\s+testTranslationConnection/, 'page must test the Vercel/DeepSeek connection before translating a batch');
+has(/await\s+testTranslationConnection\(\)/, 'translation must run a preflight check before marking products failed');
+has(/callTranslationApi\(['"]health['"]/, 'page must call the API health operation before a translation queue');
+has(/parseTranslationApiError/, 'page must show useful API errors instead of raw failed statuses');
 has(/function\s+validateTranslatedDescription/, 'page must locally validate reviewed translations');
 has(/لا تختصر|لا تلخص/, 'translation prompt must explicitly forbid shortening or summarizing');
 has(/حافظ على كل التفاصيل/, 'translation prompt must preserve all source details');
