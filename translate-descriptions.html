@@ -58,18 +58,23 @@ h1{font-size:clamp(1.55rem,3vw,2.1rem);font-weight:700;margin-bottom:8px}
 .panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
 .panel h2{font-size:1.05rem}
 .muted{color:var(--text3)}
-.search,.field input,.field select{width:100%;padding:10px 12px;background:#ffffff;border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;outline:none;min-height:42px}
+.search,.field input,.field select,.brand-sort{width:100%;padding:10px 12px;background:#ffffff;border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;outline:none;min-height:42px}
 .field label{display:block;font-size:.7rem;color:var(--text2);margin-bottom:5px;font-weight:700}
 .settings-grid{display:grid;grid-template-columns:minmax(140px,1fr) minmax(170px,1fr) minmax(120px,.7fr) minmax(230px,1.7fr);gap:10px;align-items:end;margin-bottom:12px}
 @media(max-width:900px){.settings-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:620px){.settings-grid{grid-template-columns:1fr}}
 .brand-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.brand-sort{flex:1 1 165px;padding:6px 9px;min-height:34px;font-size:.72rem;font-weight:700}
 .brand-grid{display:grid;grid-template-columns:1fr;gap:8px;max-height:470px;overflow:auto;padding-inline-end:4px}
 .brand-item{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#ffffff;border:1px solid var(--border);border-radius:8px;padding:9px 10px;font-size:.8rem}
 .brand-item label{display:flex;align-items:center;gap:8px;cursor:pointer;min-width:0}
 .brand-item input{accent-color:var(--accent)}
 .brand-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.count{color:var(--text3);font-size:.72rem;white-space:nowrap}
+.brand-counts{display:flex;align-items:center;gap:5px;flex-wrap:wrap;justify-content:flex-end}
+.brand-count{display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:5px;font-size:.67rem;font-weight:800;white-space:nowrap}
+.brand-count.green{background:var(--green-dim);color:var(--green)}
+.brand-count.red{background:var(--red-dim);color:var(--red)}
+.brand-count.amber{background:var(--amber-dim);color:var(--amber)}
 .preview-tools{display:grid;grid-template-columns:minmax(220px,1.4fr) repeat(2,minmax(150px,1fr)) auto;gap:8px;margin-bottom:12px;align-items:center}
 .preview-tools .search,.preview-tools select{width:100%;padding:10px 12px;background:#ffffff;border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;outline:none;min-height:42px}
 @media(max-width:900px){.preview-tools{grid-template-columns:1fr 1fr}.preview-tools .btn{grid-column:1/-1}}
@@ -159,6 +164,16 @@ tr:hover td{background:rgba(13,148,136,.055)}
       </div>
       <input class="search" id="brandSearch" placeholder="بحث في الماركات..." oninput="renderBrandChecks()">
       <div class="brand-tools">
+        <select class="brand-sort" id="brandSort" onchange="renderBrandChecks()" aria-label="ترتيب الماركات">
+          <option value="name_asc">الاسم أ-ي</option>
+          <option value="name_desc">الاسم ي-أ</option>
+          <option value="arabic_asc">الأخضر الأقل</option>
+          <option value="arabic_desc">الأخضر الأعلى</option>
+          <option value="ready_asc">الأحمر الأقل</option>
+          <option value="ready_desc">الأحمر الأعلى</option>
+          <option value="total_asc">الأصفر الأقل</option>
+          <option value="total_desc">الأصفر الأعلى</option>
+        </select>
         <button class="btn small" onclick="setVisibleBrands(true)">تحديد الظاهر</button>
         <button class="btn small" onclick="setVisibleBrands(false)">إلغاء الظاهر</button>
       </div>
@@ -301,6 +316,8 @@ function resetAnalysisState(){
   document.getElementById('stats').style.display='none';
   document.getElementById('previewBody').innerHTML='';
   document.getElementById('brandChecks').innerHTML='';
+  const brandSort=document.getElementById('brandSort');
+  if(brandSort)brandSort.value='name_asc';
   document.getElementById('downloadBtn').disabled=true;
   document.getElementById('translateBtn').disabled=true;
   document.getElementById('retryBtn').disabled=true;
@@ -462,24 +479,54 @@ function prepareTranslationStates(){
     });
   }
 }
-function brandsWithCounts(){
-  const counts=new Map();
+function brandSummaryEntries(){
+  const summaries=new Map();
   for(const product of products){
     const brand=brandFor(product);
-    counts.set(brand,(counts.get(brand)||0)+1);
+    if(!summaries.has(brand))summaries.set(brand,{brand,total:0,arabic:0,ready:0});
+    const summary=summaries.get(brand);
+    const state=stateFor(product);
+    summary.total++;
+    if(state.status==='skipped_arabic_or_mixed')summary.arabic++;
+    if(statusGroup(state.status)==='untranslated')summary.ready++;
   }
-  return [...counts].sort((a,b)=>a[0].localeCompare(b[0]));
+  return [...summaries.values()];
+}
+function compareBrandSummaries(a,b,sortValue){
+  const nameCompare=a.brand.localeCompare(b.brand);
+  const compareCount=(key,direction)=>{
+    const diff=a[key]-b[key];
+    return direction==='asc'?(diff||nameCompare):(-diff||nameCompare);
+  };
+  if(sortValue==='name_desc')return b.brand.localeCompare(a.brand);
+  if(sortValue==='arabic_asc')return compareCount('arabic','asc');
+  if(sortValue==='arabic_desc')return compareCount('arabic','desc');
+  if(sortValue==='ready_asc')return compareCount('ready','asc');
+  if(sortValue==='ready_desc')return compareCount('ready','desc');
+  if(sortValue==='total_asc')return compareCount('total','asc');
+  if(sortValue==='total_desc')return compareCount('total','desc');
+  return nameCompare;
+}
+function brandsWithCounts(){
+  return brandSummaryEntries().map(entry=>[entry.brand,entry.total]);
 }
 function visibleBrandEntries(){
   const q=document.getElementById('brandSearch')?.value.trim().toLowerCase()||'';
-  return brandsWithCounts().filter(([brand])=>!q||brand.toLowerCase().includes(q));
+  const sortValue=document.getElementById('brandSort')?.value||'name_asc';
+  return brandSummaryEntries()
+    .filter(entry=>!q||entry.brand.toLowerCase().includes(q))
+    .sort((a,b)=>compareBrandSummaries(a,b,sortValue));
 }
 function renderBrandChecks(){
   const body=document.getElementById('brandChecks');
-  body.innerHTML=visibleBrandEntries().map(([brand,count])=>`
+  body.innerHTML=visibleBrandEntries().map(({brand,total,arabic,ready})=>`
     <div class="brand-item">
       <label><input type="checkbox" ${selectedBrands.has(brand)?'checked':''} onchange="toggleBrand('${escapeAttr(encodeURIComponent(brand))}',this.checked)"><span class="brand-name">${escapeHtml(brand)}</span></label>
-      <span class="count">${count.toLocaleString()}</span>
+      <span class="brand-counts" aria-label="إحصائيات الماركة">
+        <span class="brand-count green" title="عربي/مختلط">عربي ${arabic.toLocaleString()}</span>
+        <span class="brand-count red" title="جاهز للترجمة">جاهز ${ready.toLocaleString()}</span>
+        <span class="brand-count amber" title="إجمالي المنتجات">إجمالي ${total.toLocaleString()}</span>
+      </span>
     </div>
   `).join('');
 }
@@ -489,7 +536,7 @@ function toggleBrand(encodedBrand,checked){
   updateStats();renderBrandChecks();renderPreview();
 }
 function setVisibleBrands(checked){
-  for(const [brand] of visibleBrandEntries()){
+  for(const {brand} of visibleBrandEntries()){
     if(checked)selectedBrands.add(brand);else selectedBrands.delete(brand);
   }
   updateStats();renderBrandChecks();renderPreview();
@@ -542,6 +589,7 @@ function updateStats(){
   document.getElementById('translateBtn').disabled=!selectedBrands.size||!ready||translationRunning;
   document.getElementById('retryBtn').disabled=!selectedBrands.size||!failed||translationRunning;
   document.getElementById('downloadBtn').disabled=!exportable||translationRunning;
+  renderBrandChecks();
 }
 function filteredPreviewProducts(){
   const q=document.getElementById('previewSearch').value.trim().toLowerCase();
