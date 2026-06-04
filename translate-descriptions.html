@@ -776,9 +776,10 @@ async function translateProduct(product){
   updateStats();renderPreview();
   try{
     const translated=await callTranslationApi('translate',[
-      {role:'system',content:'ترجم وصف المنتج من الإنجليزية إلى العربية لمتجر عطور. لا تختصر ولا تلخص ولا تحذف أي تفصيل من النص الأصلي؛ حافظ على كل التفاصيل والمعاني والفوائد والنبرة. اجعل الترجمة بصياغة عربية وصفية جذابة وغنية وسلسة، ويفضل أن تكون العبارات جميلة ومقنعة ما دامت لا تضيف ادعاءات غير موجودة. أعد JSON فقط بالمفتاح translated. لا تضف مقدمات أو تعليقات أو Markdown أو نجوم.'},
+      {role:'system',content:'ترجم وصف المنتج إلى العربية لمتجر عطور بصياغة عربية وصفية جذابة. لا تختصر ولا تلخص ولا تحذف أي تفصيل من النص الأصلي. أعد JSON واحد فقط بهذا الشكل: {"translated":"النص العربي"}. لا تستخدم علامات تنصيص داخل النص العربي إلا عند الضرورة. لا تضف مقدمات أو تعليقات أو Markdown أو نجوم.'},
       {role:'user',content:JSON.stringify({title:textFor(product,'name'),description:htmlToPlainText(state.source)})}
     ]);
+    if(translated.fallbackUsed)logMsg(`تنبيه: رد DeepSeek غير صالح JSON وتم استخدام fallback للمنتج ${escapeHtml(textFor(product,'name'))}`);
     const reviewed=await reviewTranslations(state.source,translated.translated||'',textFor(product,'name'));
     const cleaned=htmlToPlainText(reviewed.cleaned||translated.translated||'');
     const local=validateTranslatedDescription(cleaned,textFor(product,'name'));

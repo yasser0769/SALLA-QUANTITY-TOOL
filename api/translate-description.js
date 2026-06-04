@@ -23,13 +23,81 @@ function readRequestBody(request) {
   });
 }
 
-function parseJsonFromModel(text) {
-  const raw = String(text ?? '').trim().replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim();
-  if (!raw) throw new Error('DeepSeek returned empty JSON content');
-  return JSON.parse(raw);
+function stripCodeFence(text) {
+  return String(text ?? '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
 }
 
-module.exports = async function handler(request, response) {
+function safeModelExcerpt(text) {
+  return stripCodeFence(text)
+    .replace(/sk-[A-Za-z0-9_-]+/g, 'sk-***')
+    .replace(/\s+/g, ' ')
+    .slice(0, 240);
+}
+
+function extractJsonObject(text) {
+  const raw = stripCodeFence(text);
+  const start = raw.indexOf('{');
+  const end = raw.lastIndexOf('}');
+  if (start < 0 || end <= start) return '';
+  return raw.slice(start, end + 1);
+}
+
+function recoverTranslatedText(raw) {
+  const text = stripCodeFence(raw);
+  const translatedMatch = text.match(/^\s*\{\s*"translated"\s*:\s*"([\s\S]*)"\s*\}\s*$/);
+  const candidate = translatedMatch ? translatedMatch[1] : text;
+  const cleaned = candidate
+    .replace(/^["'\s]+|["'\s]+$/g, '')
+    .replace(/\\"/g, '"')
+    .replace(/\\n/g, '\n')
+    .trim();
+  if (!cleaned || /^(Here is|Here's|I will translate|سوف أترجم|سأترجم)/i.test(cleaned)) return '';
+  return cleaned;
+}
+
+function parseModelJsonSafely(text, operation) {
+  const raw = stripCodeFence(text);
+  if (!raw) throw new Error('DeepSeek returned empty JSON content');
+
+  try {
+    const parsed = JSON.parse(raw);
+    return { ...parsed, fallbackUsed: false };
+  } catch (firstError) {
+    const extracted = extractJsonObject(raw);
+    if (extracted && extracted !== raw) {
+      try {
+        const parsed = JSON.parse(extracted);
+        return { ...parsed, fallbackUsed: true };
+      } catch (secondError) {
+        // Continue to operation-specific fallback below.
+      }
+    }
+
+    if (operation === 'translate') {
+      const translated = recoverTranslatedText(raw);
+      if (translated) {
+        return {
+          translated,
+          fallbackUsed: true,
+          diagnostic: 'رد DeepSeek غير صالح JSON وتم استخدام fallback'
+        };
+      }
+    }
+
+    if (operation === 'review') {
+      return {
+        ok: false,
+        cleaned: '',
+        reasons: [`تعذر قراءة رد DeepSeek كـ JSON: ${safeModelExcerpt(raw)}`],
+        fallbackUsed: true
+      };
+    }
+
+    throw new Error(`تعذر قراءة رد DeepSeek كـ JSON: ${safeModelExcerpt(raw)}`);
+  }
+}
+
+async function handler(request, response) {
   if (request.method === 'GET') {
     return sendJson(response, 200, {
       ok: true,
@@ -94,7 +162,7 @@ module.exports = async function handler(request, response) {
         response_format: { type: 'json_object' },
         thinking: { type: 'disabled' },
         stream: false,
-        max_tokens: operation === 'translate' ? 4096 : 1024,
+        max_tokens: operation === 'translate' ? 8192 : 2048,
         temperature: operation === 'translate' ? 0.1 : 0,
         messages: requestMessages
       })
@@ -105,7 +173,7 @@ module.exports = async function handler(request, response) {
     }
 
     const data = await upstream.json();
-    const parsed = parseJsonFromModel(data.choices?.[0]?.message?.content || '');
+    const parsed = parseModelJsonSafely(data.choices?.[0]?.message?.content || '', operation);
     if (operation === 'health') {
       return sendJson(response, 200, {
         ok: parsed.ok === true,
@@ -117,4 +185,8 @@ module.exports = async function handler(request, response) {
   } catch (error) {
     return sendJson(response, 500, { error: error.message || 'Translation request failed' });
   }
-};
+}
+
+module.exports = handler;
+module.exports.parseModelJsonSafely = parseModelJsonSafely;
+module.exports.safeModelExcerpt = safeModelExcerpt;

@@ -19,6 +19,11 @@ has(/process\.env\.DEEPSEEK_API_KEY/, 'API route must read DeepSeek key from Ver
 has(/process\.env\.TRANSLATION_ACCESS_TOKEN/, 'API route must read access token from Vercel env');
 has(/https:\/\/api\.deepseek\.com\/chat\/completions/, 'API route must call DeepSeek server-side');
 has(/response_format\s*:\s*\{\s*type\s*:\s*['"]json_object['"]\s*\}/, 'API route must request JSON object responses from DeepSeek');
+has(/function\s+parseModelJsonSafely/, 'API route must parse model JSON with a tolerant fallback');
+has(/fallbackUsed/, 'API route must mark when a fallback parser was used');
+has(/safeModelExcerpt/, 'API route must produce a safe diagnostic excerpt when parsing fails');
+has(/operation\s*===\s*['"]translate['"][\s\S]*translated/, 'translation operation must recover usable translated text when JSON parsing fails');
+has(/operation\s*===\s*['"]review['"][\s\S]*ok\s*:\s*false/, 'review operation must fail softly when JSON parsing fails');
 has(/thinking\s*:\s*\{\s*type\s*:\s*['"]disabled['"]\s*\}/, 'API route must disable DeepSeek thinking mode for reliable JSON output');
 has(/stream\s*:\s*false/, 'API route must request non-streaming DeepSeek responses');
 has(/max_tokens/, 'API route must set max_tokens to avoid truncated JSON responses');
