@@ -29,6 +29,10 @@ has(/function\s+brandFileKeysForRow/, 'page must derive brand-file matching keys
 has(/function\s+brandFileArabicNameForRow/, 'page must extract Arabic brand names from optional brand-file rows');
 has(/id="brandFile"/, 'page must include an optional brand-file upload input');
 has(/id="brandFileInfo"/, 'page must show selected optional brand-file information');
+has(/https:\/\/s\.salla\.sa\/export\/products\?type=xlsx&amp;export-for-update=1/, 'page must link to Salla products export for update');
+has(/https:\/\/s\.salla\.sa\/brands\/export\/xlsx/, 'page must link to Salla brands export');
+has(/https:\/\/www\.fragrancex\.com\/customeraccount\/_tofile_true-am-cid_frgxexcel__wholesale_pricelisthtml\.html/, 'page must link to supplier wholesale price file');
+has(/https:\/\/www\.fragrancex\.com\/customeraccount\/_toshopify_true-am-cid_frgx__wholesale_pricelisthtml\.html/, 'page must link to supplier Shopify file');
 has(/function\s+sizeMl/, 'page must derive Arabic ml size values from Size/Type');
 has(/function\s+arabicType/, 'page must derive Arabic perfume/type labels from Size/Type');
 has(/stCsv/, 'stats must include CSV SKU count');

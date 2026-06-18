@@ -30,6 +30,9 @@ h1{font-size:clamp(1.55rem,3vw,2.1rem);font-weight:700;margin-bottom:8px}
 .note,.panel{background:linear-gradient(180deg,#ffffff,#f8fafc);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
 .note{border-inline-start:3px solid var(--accent);padding:17px 20px;margin-bottom:20px;font-size:.82rem;color:var(--text2);line-height:1.95}
 .note strong{color:var(--text)}
+.source-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-bottom:20px}
+.source-actions .btn{display:flex;align-items:center;justify-content:center;text-align:center;min-height:44px;text-decoration:none}
+@media(max-width:760px){.source-actions{grid-template-columns:1fr}}
 .uploads{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
 @media(max-width:860px){.uploads{grid-template-columns:1fr}}
 .upload-zone{background:linear-gradient(180deg,var(--surface2),var(--surface));border:1px dashed var(--border2);border-radius:var(--radius);padding:24px 18px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s,transform .2s,box-shadow .2s;min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center}
@@ -118,6 +121,13 @@ tr:hover td{background:rgba(13,148,136,.055)}
     <strong>الماركات:</strong> منتجات الماركات الموجودة في سلة تدخل تلقائياً، وإذا رفعت ملف الماركات تدخل ماركاته تلقائياً أيضاً، والمتبقي يظهر لك للاختيار اليدوي.<br>
     <strong>الصور:</strong> أي رابط FragranceX بصيغة <span dir="ltr">/small/</span> يتم تحويله تلقائياً إلى <span dir="ltr">/large/</span> في ملف سلة الناتج.<br>
     <strong>الخيارات:</strong> إذا كان المنتج له أكثر من حجم، يدخل كسطر أب بلا صورة وتحته الخيارات، وصور الخيارات فقط تكون داخل أعمدة الخيار.
+  </div>
+
+  <div class="source-actions" aria-label="روابط تصدير وتحميل ملفات المنتجات الجديدة">
+    <a class="btn primary" href="https://s.salla.sa/export/products?type=xlsx&amp;export-for-update=1" target="_blank" rel="noopener">تصدير منتجات سلة</a>
+    <a class="btn primary" href="https://s.salla.sa/brands/export/xlsx" target="_blank" rel="noopener">تصدير ماركات سلة</a>
+    <a class="btn" href="https://www.fragrancex.com/customeraccount/_tofile_true-am-cid_frgxexcel__wholesale_pricelisthtml.html" target="_blank" rel="noopener">تحميل أسعار المورد</a>
+    <a class="btn" href="https://www.fragrancex.com/customeraccount/_toshopify_true-am-cid_frgx__wholesale_pricelisthtml.html" target="_blank" rel="noopener">تحميل ملف Shopify للمورد</a>
   </div>
 
   <div class="uploads" id="uploadStepArea">
