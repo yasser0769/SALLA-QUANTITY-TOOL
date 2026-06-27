@@ -353,7 +353,15 @@ function goToTranslationStep(){
 }
 function goToPreviewStep(){showStep('preview');}
 function checkReady(){document.getElementById('analyzeBtn').disabled=!(sallaFile&&supplierFile&&priceListFile);}
-function readArrayBuffer(file){return file.arrayBuffer();}
+function readArrayBuffer(file){
+  if(!file)throw new Error('لم يتم اختيار ملف صالح');
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=event=>resolve(event.target.result);
+    reader.onerror=()=>reject(reader.error||new Error('تعذر قراءة الملف'));
+    reader.readAsArrayBuffer(file);
+  });
+}
 
 async function loadSallaProducts(event){
   sallaFile=event.target.files[0];if(!sallaFile)return;

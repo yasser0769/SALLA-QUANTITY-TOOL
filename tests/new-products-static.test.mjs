@@ -42,6 +42,10 @@ has(/stExcluded/, 'stats must include XLS-only excluded SKU count');
 has(/const\s+TEMPLATE_BASE64='[^']{1000,}'/, 'page must embed a template fallback for file:// usage');
 has(/function\s+base64ToArrayBuffer/, 'page must decode embedded template fallback');
 has(/catch\s*\([^)]*\)\s*\{[\s\S]*TEMPLATE_BASE64/, 'workbookFromTemplate must fallback when fetch fails');
+has(/function\s+readArrayBuffer\(file\)\s*\{[\s\S]*new Promise/, 'file reads must use the stable FileReader path instead of direct file.arrayBuffer');
+has(/if\(!file\)throw new Error\('لم يتم اختيار ملف صالح'\)/, 'file reads must fail with a clear Arabic message when no file is available');
+has(/reader\.readAsArrayBuffer\(file\)/, 'file reads must explicitly read the selected file as an array buffer');
+notHas(/function\s+readArrayBuffer\(file\)\s*\{\s*return\s+file\.arrayBuffer\(\);?\s*\}/, 'file reads must not call arrayBuffer on a possibly undefined file');
 
 const checkReadyBody = html.match(/function\s+checkReady\s*\(\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
 assert.ok(!checkReadyBody.includes('brandFile'), 'optional brand file must not be required before analysis');

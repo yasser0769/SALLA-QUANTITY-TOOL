@@ -46,6 +46,10 @@ has(/function\s+resetAnalysisState/, 'page must reset analysis state when a new 
 has(/resetAnalysisState\(\)/, 'file loading must clear stale translation/export state');
 has(/function\s+checkReady/, 'page must require both Salla and Shopify files before analysis');
 has(/analyzeBtn.*sallaFile.*shopifyFile|sallaFile.*shopifyFile.*analyzeBtn/s, 'analysis must require both uploaded files');
+has(/function\s+readArrayBuffer\(file\)\s*\{[\s\S]*new Promise/, 'Salla workbook reads must use the stable FileReader path instead of direct file.arrayBuffer');
+has(/if\(!file\)throw new Error\('لم يتم اختيار ملف صالح'\)/, 'Salla workbook reads must fail with a clear Arabic message when no file is available');
+has(/reader\.readAsArrayBuffer\(file\)/, 'Salla workbook reads must explicitly read the selected file as an array buffer');
+notHas(/function\s+readArrayBuffer\(file\)\s*\{\s*return\s+file\.arrayBuffer\(\);?\s*\}/, 'Salla workbook reads must not call arrayBuffer on a possibly undefined file');
 has(/duplicateHeaders/, 'page must detect duplicate Salla headers before export-sensitive writes');
 has(/function\s+toggleBrand/, 'page must support multi-brand toggling');
 has(/function\s+setVisibleBrands/, 'page must support selecting all visible brands');
