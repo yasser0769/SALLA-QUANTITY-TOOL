@@ -99,6 +99,38 @@ tr:hover td{background:rgba(13,148,136,.055)}
 .pill.translation.untranslated{background:rgba(112,120,135,.16);color:var(--text2)}
 .btn.small{padding:6px 9px;font-size:.7rem;border-radius:6px}
 .empty{text-align:center;padding:36px;color:var(--text3);font-size:.85rem}
+
+/* Interface refresh: navigation, command bars, buttons, and upload states */
+:root{
+  --accent:#0f766e;--accent-strong:#115e59;--blue:#2563eb;--violet:#7c3aed;
+  --cmd-shadow:0 18px 38px rgba(15,23,42,.09);--hover-shadow:0 18px 32px rgba(15,23,42,.14);
+  --radius:8px;
+}
+.hdr{margin-bottom:24px;padding-bottom:22px}
+.hdr .badge,.badge{border-color:rgba(15,118,110,.24);background:#ecfdf5;color:#0f766e;font-weight:800}
+.top-links{display:inline-flex;align-items:center;justify-content:center;gap:4px;flex-wrap:wrap;margin-top:18px;padding:5px;background:#ffffff;border:1px solid var(--border);border-radius:999px;box-shadow:0 12px 28px rgba(15,23,42,.07)}
+.top-links a,.top-link{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:7px 13px;border-radius:999px;color:var(--text2);font-size:.78rem;font-weight:800;text-decoration:none;transition:background .2s,color .2s,transform .2s,box-shadow .2s}
+.top-links a:hover,.top-link:hover{background:#ecfdf5;color:var(--accent-strong);transform:translateY(-1px);box-shadow:0 8px 18px rgba(15,118,110,.12)}
+.source-actions{grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;padding:10px;background:#ffffff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--cmd-shadow)}
+.source-actions .btn{min-height:48px;padding:11px 13px;line-height:1.35;white-space:normal;border-color:transparent}
+.source-actions .btn.primary:nth-of-type(1){background:linear-gradient(135deg,#0f766e,#0e7490)}
+.source-actions .btn.primary:nth-of-type(2){background:linear-gradient(135deg,#2563eb,#0f766e)}
+.source-actions .btn.primary:nth-of-type(3){background:linear-gradient(135deg,#7c3aed,#2563eb)}
+.source-actions .btn:not(.primary){border-color:rgba(100,116,139,.24);background:#f8fafc;color:var(--text)}
+.btn,.tab,.filter{border-radius:var(--radius);transition:background .2s,color .2s,border-color .2s,transform .2s,box-shadow .2s,opacity .2s}
+.btn:hover:not(:disabled),.tab:hover{border-color:rgba(15,118,110,.42);background:#ffffff;box-shadow:0 10px 22px rgba(15,23,42,.09);transform:translateY(-1px)}
+.btn.primary{background:linear-gradient(135deg,#0f766e,#155e75);border-color:transparent;color:#fff;box-shadow:0 14px 28px rgba(15,118,110,.18)}
+.btn.primary:hover:not(:disabled){background:linear-gradient(135deg,#115e59,#1d4ed8);box-shadow:var(--hover-shadow);transform:translateY(-2px)}
+.upload-zone{position:relative;overflow:hidden;border-color:rgba(100,116,139,.26);background:linear-gradient(180deg,#ffffff,#f8fafc);box-shadow:0 8px 20px rgba(15,23,42,.045)}
+.upload-zone::before{content:'';position:absolute;inset-block-start:0;inset-inline:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--blue),var(--violet));transform:scaleX(0);transform-origin:right;transition:transform .22s}
+.upload-zone:hover{border-color:rgba(15,118,110,.45);background:#ffffff;box-shadow:var(--hover-shadow);transform:translateY(-3px)}
+.upload-zone:hover::before,.upload-zone.ok::before{transform:scaleX(1)}
+.upload-zone .ico{width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:var(--radius);background:#eef6ff;color:var(--accent);font-size:1.35rem;margin-bottom:10px}
+.upload-zone.ok{border-color:rgba(22,163,74,.5);background:linear-gradient(180deg,#f0fdf4,#ffffff)}
+.note{background:#ffffff;box-shadow:0 12px 28px rgba(15,23,42,.06);border-inline-start-color:var(--accent)}
+.app > .actions{align-items:center;padding:10px;background:#ffffff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--cmd-shadow)}
+.tab.on{background:#ecfdf5;border-color:rgba(15,118,110,.34);color:var(--accent-strong);box-shadow:0 8px 18px rgba(15,118,110,.08)}
+.search:focus,.field input:focus,.field select:focus,.preview-tools select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(15,118,110,.12)}
 </style>
 </head>
 <body>
