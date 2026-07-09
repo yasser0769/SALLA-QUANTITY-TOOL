@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تجهيز الطلبات</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#f6f8fb;--surface:#ffffff;--surface2:#f8fafc;--surface3:#eef2f7;
+  --border:#dbe3ed;--border2:#c7d2df;--text:#111827;--text2:#4b5563;--text3:#7b8494;
+  --accent:#0f766e;--accent-strong:#115e59;--blue:#2563eb;--violet:#7c3aed;
+  --green:#16a34a;--red:#e11d48;--amber:#d97706;
+  --green-dim:rgba(22,163,74,.11);--red-dim:rgba(225,29,72,.1);--amber-dim:rgba(217,119,6,.12);
+  --shadow:0 16px 36px rgba(15,23,42,.08);--cmd-shadow:0 18px 38px rgba(15,23,42,.09);
+  --hover-shadow:0 18px 32px rgba(15,23,42,.14);--radius:8px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{background:var(--bg)}
+body{font-family:'IBM Plex Sans Arabic',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:linear-gradient(180deg,#ffffff 0,#f6f8fb 280px);color:var(--text);min-height:100vh;line-height:1.65}
+.grain{position:fixed;inset:0;pointer-events:none;opacity:.012;z-index:9999;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.app{max-width:1200px;margin:0 auto;padding:38px 20px 80px;position:relative;z-index:1}
+.hdr{text-align:center;margin-bottom:24px;border-bottom:1px solid var(--border);padding-bottom:22px}
+.badge{display:inline-flex;align-items:center;padding:5px 12px;border:1px solid rgba(15,118,110,.24);border-radius:999px;font-size:.68rem;font-weight:800;background:#ecfdf5;color:#0f766e;margin-bottom:13px}
+h1{font-size:clamp(1.55rem,3vw,2.1rem);font-weight:700;margin-bottom:8px}
+.hdr p{color:var(--text2);font-size:.92rem;font-weight:400;max-width:780px;margin:0 auto}
+.top-links{display:inline-flex;align-items:center;justify-content:center;gap:4px;flex-wrap:wrap;margin-top:18px;padding:5px;background:#ffffff;border:1px solid var(--border);border-radius:999px;box-shadow:0 12px 28px rgba(15,23,42,.07)}
+.top-links a{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:7px 13px;border-radius:999px;color:var(--text2);font-size:.78rem;font-weight:800;text-decoration:none;transition:background .2s,color .2s,transform .2s,box-shadow .2s}
+.top-links a:hover,.top-links a.on{background:#ecfdf5;color:var(--accent-strong);transform:translateY(-1px);box-shadow:0 8px 18px rgba(15,118,110,.12)}
+.note,.panel{background:#ffffff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+.note{border-inline-start:3px solid var(--accent);padding:17px 20px;margin-bottom:20px;font-size:.82rem;color:var(--text2);line-height:1.95}
+.note strong{color:var(--text)}
+.settings{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:12px;margin-bottom:18px;padding:14px;background:#ffffff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--cmd-shadow)}
+.field label{display:block;font-size:.7rem;color:var(--text2);margin-bottom:5px;font-weight:700}
+.field input,.field select{width:100%;padding:10px 12px;background:#ffffff;border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:.82rem;outline:none;min-height:42px}
+.field input:focus,.field select:focus,.search:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(15,118,110,.12)}
+.key-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px}
+.icon-btn{min-width:42px;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text2);font-family:inherit;font-weight:800;cursor:pointer}
+.remember{display:flex;align-items:center;gap:8px;margin-top:7px;color:var(--text3);font-size:.72rem}
+.remember input{width:auto;min-height:0;accent-color:var(--accent)}
+@media(max-width:920px){.settings{grid-template-columns:1fr 1fr}}
+@media(max-width:620px){.settings{grid-template-columns:1fr}.key-row{grid-template-columns:1fr auto}}
+.upload-zone{background:linear-gradient(180deg,#ffffff,#f8fafc);border:1px dashed rgba(100,116,139,.28);border-radius:var(--radius);padding:28px 18px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s,transform .2s,box-shadow .2s;margin-bottom:16px;min-height:170px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.upload-zone::before{content:'';position:absolute;inset-block-start:0;inset-inline:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--blue),var(--violet));transform:scaleX(0);transform-origin:right;transition:transform .22s}
+.upload-zone:hover{border-color:rgba(15,118,110,.45);background:#ffffff;box-shadow:var(--hover-shadow);transform:translateY(-3px)}
+.upload-zone:hover::before,.upload-zone.ok::before,.upload-zone.drag::before{transform:scaleX(1)}
+.upload-zone.ok{border-style:solid;border-color:rgba(22,163,74,.5);background:linear-gradient(180deg,#f0fdf4,#ffffff)}
+.upload-zone.drag{border-color:rgba(37,99,235,.5);background:#eff6ff}
+.upload-zone input{display:none}
+.upload-zone .ico{width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:var(--radius);background:#eef6ff;color:var(--accent);font-size:1.45rem;margin-bottom:10px}
+.upload-zone h2{font-size:1rem;font-weight:800;margin-bottom:4px}
+.upload-zone .sub{font-size:.76rem;color:var(--text2)}
+.file-info{font-size:.78rem;color:var(--green);margin-top:10px;font-weight:700;word-break:break-word}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;padding:10px;background:#ffffff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--cmd-shadow)}
+.btn{padding:11px 17px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text);font-family:inherit;font-size:.86rem;font-weight:800;cursor:pointer;transition:background .2s,color .2s,border-color .2s,transform .2s,box-shadow .2s,opacity .2s;text-decoration:none}
+.btn:hover:not(:disabled){border-color:rgba(15,118,110,.42);background:#fff;box-shadow:0 10px 22px rgba(15,23,42,.09);transform:translateY(-1px)}
+.btn.primary{background:linear-gradient(135deg,#0f766e,#155e75);border-color:transparent;color:#fff;box-shadow:0 14px 28px rgba(15,118,110,.18)}
+.btn.primary:hover:not(:disabled){background:linear-gradient(135deg,#115e59,#1d4ed8);box-shadow:var(--hover-shadow);transform:translateY(-2px)}
+.btn:disabled{opacity:.38;cursor:not-allowed;box-shadow:none;transform:none}
+.progress{height:4px;background:var(--surface2);border-radius:4px;margin-bottom:16px;overflow:hidden;display:none}
+.progress .bar{height:100%;background:linear-gradient(90deg,var(--accent),var(--blue),var(--amber));width:0;transition:width .25s}
+.log{background:#f8fafc;border:1px solid var(--border);border-radius:var(--radius);padding:13px 16px;margin-bottom:18px;font-size:.75rem;color:var(--text2);max-height:126px;overflow:auto;display:none;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;direction:rtl}
+.stats{display:none;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:10px;margin-bottom:18px}
+.stat{background:linear-gradient(180deg,#ffffff,#f8fafc);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center;box-shadow:var(--shadow)}
+.stat .n{font-size:1.35rem;font-weight:800;margin-bottom:1px}
+.stat .l{font-size:.7rem;color:var(--text2)}
+.panel{display:none;padding:16px;margin-bottom:20px}
+.panel.on{display:block}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.panel h2{font-size:1.05rem}
+.preview-tools{display:grid;grid-template-columns:minmax(220px,1fr) auto auto;gap:8px;margin-bottom:12px;align-items:center}
+.search{width:100%;padding:10px 12px;background:#ffffff;border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;outline:none;min-height:42px}
+@media(max-width:760px){.preview-tools{grid-template-columns:1fr}.actions .btn{width:100%}}
+.table-wrap{background:#fff;border:1px solid var(--border);border-radius:var(--radius);overflow:auto;max-height:62vh;box-shadow:var(--shadow)}
+table{width:100%;border-collapse:collapse;font-size:.76rem;min-width:1220px;direction:ltr}
+thead{position:sticky;top:0;z-index:2}
+th{background:#f1f5f9;padding:11px 8px;font-weight:800;text-align:left;color:var(--text2);font-size:.7rem;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:7px 8px;border-bottom:1px solid rgba(219,227,237,.78);white-space:nowrap;vertical-align:top}
+tr:hover td{background:rgba(15,118,110,.045)}
+td input{width:100%;min-width:90px;border:1px solid transparent;background:transparent;border-radius:6px;padding:6px 7px;font-family:inherit;font-size:.74rem;color:var(--text);outline:none}
+td input:focus{border-color:rgba(15,118,110,.45);background:#fff;box-shadow:0 0 0 3px rgba(15,118,110,.1)}
+.pill{display:inline-block;padding:2px 8px;border-radius:5px;font-size:.68rem;font-weight:800}
+.ok{background:var(--green-dim);color:var(--green)}
+.warn{background:var(--amber-dim);color:var(--amber)}
+.bad{background:var(--red-dim);color:var(--red)}
+.empty{text-align:center;padding:34px;color:var(--text3);font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<main class="app">
+  <header class="hdr">
+    <div class="badge">SALLA ORDER PREP TOOL</div>
+    <h1>تجهيز الطلبات</h1>
+    <p>ارفع ملف طلبات سلة العربي، ثم حوّل الأسماء والعناوين وتفاصيل المنتجات إلى ملف CSV جاهز للشحن.</p>
+    <div class="top-links">
+      <a href="index.html">تحديث الأسعار والكميات</a>
+      <a href="new-products.html">المنتجات الجديدة</a>
+      <a href="fix-options.html">إصلاح الخيارات</a>
+      <a href="translate-descriptions.html">ترجمة الأوصاف</a>
+      <a class="on" href="prepare-orders.html">تجهيز الطلبات</a>
+    </div>
+  </header>
+
+  <div class="note">
+    <strong>طريقة العمل:</strong> الصفحة تقرأ الأعمدة نفسها في أداة Order Converter الأصلية: رقم الطلب، اسم العميل، الجوال، المدينة، SKU، عنوان العميل، وأسماء المنتجات مع الكميات.
+    يتم إرسال الاسم والمدينة والعنوان فقط إلى مزود الذكاء الاصطناعي لاستخراج الاسم الإنجليزي، المدينة، المنطقة، الرمز البريدي، والعنوان المختصر.
+  </div>
+
+  <section class="settings" aria-label="إعدادات API">
+    <div class="field">
+      <label for="provider">مزود API</label>
+      <select id="provider" onchange="syncModelOptions(); saveSettings();">
+        <option value="openrouter">OpenRouter</option>
+        <option value="deepseek">DeepSeek</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="model">الموديل</label>
+      <select id="model" onchange="saveSettings()"></select>
+    </div>
+    <div class="field">
+      <label for="batchSize">حجم الدفعة</label>
+      <input id="batchSize" type="number" min="1" max="100" value="25" onchange="saveSettings()">
+    </div>
+    <div class="field">
+      <label for="accessToken">رمز الدخول</label>
+      <div class="key-row">
+        <input id="accessToken" type="password" autocomplete="off" placeholder="نفس الرمز السري" oninput="saveSettings()">
+        <button class="icon-btn" type="button" onclick="toggleAccessToken()" title="إظهار أو إخفاء الرمز">عرض</button>
+      </div>
+      <label class="remember"><input id="rememberToken" type="checkbox" checked onchange="saveSettings()"> حفظ الرمز في هذا المتصفح</label>
+    </div>
+  </section>
+
+  <section class="upload-zone" id="orderZone" onclick="document.getElementById('orderFile').click()">
+    <input type="file" id="orderFile" accept=".xlsx,.xls" onchange="loadOrderFile(event)">
+    <div class="ico">📦</div>
+    <h2>ملف طلبات سلة</h2>
+    <div class="sub">اسحب ملف .xlsx هنا أو اضغط للاختيار</div>
+    <div class="file-info" id="fileInfo"></div>
+  </section>
+
+  <div class="actions">
+    <button class="btn primary" id="processBtn" onclick="processOrders()" disabled>تجهيز الطلبات</button>
+    <button class="btn" id="exportBtn" onclick="downloadCSV()" disabled>تحميل CSV</button>
+    <button class="btn" onclick="clearResults()">مسح النتائج</button>
+  </div>
+
+  <div class="progress" id="progress"><div class="bar" id="bar"></div></div>
+  <div class="log" id="logBox"></div>
+
+  <section class="stats" id="stats">
+    <div class="stat"><div class="n" id="stOrders">0</div><div class="l">طلب مقروء</div></div>
+    <div class="stat"><div class="n" id="stConverted">0</div><div class="l">طلب جاهز</div></div>
+    <div class="stat"><div class="n" id="stMissingState">0</div><div class="l">منطقة ناقصة</div></div>
+    <div class="stat"><div class="n" id="stMissingDetails">0</div><div class="l">تفاصيل ناقصة</div></div>
+  </section>
+
+  <section class="panel" id="previewPanel">
+    <div class="panel-head">
+      <h2>مراجعة ملف الشحن</h2>
+      <span class="pill ok" id="previewCount">0 طلب</span>
+    </div>
+    <div class="preview-tools">
+      <input class="search" id="previewSearch" type="search" placeholder="بحث في رقم الطلب، الاسم، المدينة، الجوال، أو SKU..." oninput="renderPreview()">
+      <button class="btn" onclick="downloadCSV()">تحميل CSV</button>
+      <button class="btn" onclick="copyCSV()">نسخ CSV</button>
+    </div>
+    <div class="table-wrap" id="tableWrap"></div>
+  </section>
+</main>
+
+<script>
+const STORAGE_KEY = 'salla_prepare_orders_settings';
+const API_TIMEOUT_MS = 90000;
+const CSV_HEADERS = ['COrderID','FirstName','LastName','Address','Address2','City','State','Zip','Country','ShipMethod','Phone','OrderDetails','GiftWrap','Message'];
+const MODEL_OPTIONS = {
+  openrouter: [
+    ['anthropic/claude-sonnet-4', 'Claude Sonnet 4'],
+    ['google/gemini-2.5-flash', 'Gemini 2.5 Flash'],
+    ['openai/gpt-4o-mini', 'GPT-4o Mini'],
+    ['deepseek/deepseek-chat', 'DeepSeek Chat عبر OpenRouter'],
+    ['deepseek/deepseek-r1', 'DeepSeek R1 عبر OpenRouter']
+  ],
+  deepseek: [
+    ['deepseek-v4-flash', 'DeepSeek V4 Flash'],
+    ['deepseek-v4-pro', 'DeepSeek V4 Pro'],
+    ['deepseek-chat', 'DeepSeek Chat'],
+    ['deepseek-reasoner', 'DeepSeek Reasoner']
+  ]
+};
+
+let orderFile = null;
+let rawOrders = [];
+let outputRows = [];
+let processing = false;
+
+function $(id){return document.getElementById(id)}
+function log(message){
+  const box = $('logBox');
+  box.style.display = 'block';
+  const line = document.createElement('div');
+  line.textContent = `${new Date().toLocaleTimeString('ar-SA')} - ${message}`;
+  box.prepend(line);
+}
+function setProgress(percent){
+  $('progress').style.display = percent > 0 && percent < 100 ? 'block' : percent === 100 ? 'block' : 'none';
+  $('bar').style.width = `${Math.max(0, Math.min(100, percent))}%`;
+}
+function saveSettings(){
+  const settings = {
+    provider: $('provider').value,
+    model: $('model').value,
+    batchSize: $('batchSize').value,
+    rememberToken: $('rememberToken').checked,
+    accessToken: $('rememberToken').checked ? $('accessToken').value : ''
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+}
+function loadSettings(){
+  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  if (saved.provider) $('provider').value = saved.provider;
+  syncModelOptions(saved.model);
+  if (saved.batchSize) $('batchSize').value = saved.batchSize;
+  $('rememberToken').checked = saved.rememberToken !== false;
+  if (saved.accessToken) $('accessToken').value = saved.accessToken;
+}
+function syncModelOptions(preferredModel){
+  const provider = $('provider').value;
+  const select = $('model');
+  const current = preferredModel || select.value;
+  select.innerHTML = MODEL_OPTIONS[provider].map(([value,label]) => `<option value="${value}">${label}</option>`).join('');
+  const values = MODEL_OPTIONS[provider].map(([value]) => value);
+  select.value = values.includes(current) ? current : values[0];
+}
+function toggleAccessToken(){
+  const input = $('accessToken');
+  input.type = input.type === 'password' ? 'text' : 'password';
+  document.querySelector('.icon-btn').textContent = input.type === 'password' ? 'عرض' : 'إخفاء';
+}
+function checkReady(){
+  $('processBtn').disabled = processing || !orderFile;
+  $('exportBtn').disabled = outputRows.length === 0;
+}
+function loadOrderFile(event){
+  const file = event.target.files?.[0];
+  if (!file) return;
+  orderFile = file;
+  rawOrders = [];
+  outputRows = [];
+  $('fileInfo').textContent = file.name;
+  $('orderZone').classList.add('ok');
+  $('previewPanel').classList.remove('on');
+  $('stats').style.display = 'none';
+  $('tableWrap').innerHTML = '';
+  checkReady();
+}
+function setupDropZone(){
+  const zone = $('orderZone');
+  zone.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    zone.classList.add('drag');
+  });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+  zone.addEventListener('drop', (event) => {
+    event.preventDefault();
+    zone.classList.remove('drag');
+    const file = event.dataTransfer.files?.[0];
+    if (!file) return;
+    $('orderFile').files = event.dataTransfer.files;
+    loadOrderFile({ target: { files: event.dataTransfer.files } });
+  });
+}
+function readArrayBuffer(file){
+  return new Promise((resolve, reject) => {
+    if (!file) {
+      reject(new Error('لم يتم اختيار ملف صالح'));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => resolve(event.target.result);
+    reader.onerror = () => reject(new Error('تعذر قراءة الملف'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+async function parseExcelFile(file){
+  const buffer = await readArrayBuffer(file);
+  const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array' });
+  const sheetName = workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+  if (rows.length < 2) throw new Error('ملف الطلبات فارغ أو لا يحتوي على بيانات');
+  const orders = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    const orderId = String(row[0] || '').trim();
+    if (!orderId) continue;
+    orders.push({
+      orderId,
+      name: String(row[2] || '').trim(),
+      phone: String(row[3] || '').trim(),
+      city: String(row[4] || '').trim(),
+      sku: String(row[18] || '').trim(),
+      address: String(row[19] || '').trim(),
+      products: String(row[20] || '').trim()
+    });
+  }
+  return orders;
+}
+async function translateBatch(orders, accessToken, provider, model){
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+  const orderData = orders.map((order) => ({
+    orderId: order.orderId,
+    name: order.name,
+    city: order.city,
+    address: order.address
+  }));
+  try {
+    const response = await fetch('/api/prepare-orders', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Translation-Access-Token': accessToken
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        operation: 'translate',
+        provider,
+        model,
+        orders: orderData
+      })
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`API error (${response.status}): ${text.slice(0, 600)}`);
+    }
+    const data = await response.json();
+    if (!Array.isArray(data.results)) throw new Error('لم يرجع API نتائج صالحة');
+    return data.results;
+  } catch (error) {
+    if (error.name === 'AbortError') throw new Error('انتهت مهلة طلب API. جرّب تقليل حجم الدفعة.');
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+async function processOrders(){
+  if (!orderFile) return;
+  const accessToken = $('accessToken').value.trim();
+  if (!accessToken) {
+    log('أدخل رمز الدخول أولًا.');
+    return;
+  }
+  processing = true;
+  outputRows = [];
+  checkReady();
+  $('logBox').innerHTML = '';
+  setProgress(4);
+  try {
+    saveSettings();
+    log('قراءة ملف الطلبات...');
+    rawOrders = await parseExcelFile(orderFile);
+    if (rawOrders.length === 0) throw new Error('لم يتم العثور على طلبات داخل الملف');
+    $('stOrders').textContent = rawOrders.length;
+    $('stats').style.display = 'grid';
+    const batchSize = Math.max(1, Math.min(100, Number($('batchSize').value) || 25));
+    const provider = $('provider').value;
+    const model = $('model').value;
+    const aiResults = [];
+    for (let start = 0; start < rawOrders.length; start += batchSize) {
+      const batch = rawOrders.slice(start, start + batchSize);
+      log(`إرسال الدفعة ${Math.floor(start / batchSize) + 1} (${batch.length} طلب) إلى ${provider === 'deepseek' ? 'DeepSeek' : 'OpenRouter'}...`);
+      const translated = await translateBatch(batch, accessToken, provider, model);
+      aiResults.push(...translated);
+      setProgress(10 + Math.round((Math.min(start + batchSize, rawOrders.length) / rawOrders.length) * 80));
+    }
+    outputRows = mapOrderData(rawOrders, aiResults);
+    $('stConverted').textContent = outputRows.length;
+    $('stMissingState').textContent = outputRows.filter((row) => !row.State).length;
+    $('stMissingDetails').textContent = outputRows.filter((row) => !row.OrderDetails).length;
+    log(`تم تجهيز ${outputRows.length} طلب. راجع الجدول ثم حمّل CSV.`);
+    setProgress(100);
+    renderPreview();
+  } catch (error) {
+    log(`خطأ: ${error.message}`);
+  } finally {
+    processing = false;
+    checkReady();
+    setTimeout(() => setProgress(0), 900);
+  }
+}
+function extractFromAddress(address){
+  const text = String(address || '');
+  const shortAddress = text.match(/العنوان المختصر\s*([A-Z]{4}\d{4})/)?.[1] || '';
+  const zipCode = text.match(/الرمز البريدي\s*(\d{5})/)?.[1] || '';
+  const neighborhood = text.match(/حي\s+([^،,]+)/)?.[1]?.trim() || '';
+  const street = text.match(/شارع\s+([^،,]+)/)?.[1]?.trim() || '';
+  return { shortAddress, zipCode, neighborhood, street };
+}
+function formatPhone(phone){
+  let cleaned = String(phone || '').replace(/\D/g, '');
+  if (cleaned.startsWith('966')) return cleaned;
+  if (cleaned.startsWith('0')) cleaned = cleaned.slice(1);
+  return cleaned ? `966${cleaned}` : '';
+}
+function parseOrderDetails(products){
+  if (!products) return '';
+  const matches = [...String(products).matchAll(/\(SKU:\s*([^)]+?)\).*?\(Qty:\s*(\d+)\)/g)];
+  if (matches.length === 0) return '';
+  return matches.map((match) => `${match[2]},${String(match[1]).trim()}`).join('|') + '|';
+}
+const CANONICAL_REGIONS = ['Riyadh','Mecca','Madinah','Eastern Province','Al Qassim','Asir','Tabuk','Hail','Northern Borders','Jazan','Najran','Al Bahah','Al Jouf'];
+const REGION_ALIASES = {
+  riyadh:'Riyadh','riyadh region':'Riyadh',الرياض:'Riyadh',
+  mecca:'Mecca',makkah:'Mecca','makkah region':'Mecca','mecca region':'Mecca','makkah province':'Mecca',مكة:'Mecca','مكة المكرمة':'Mecca',
+  madinah:'Madinah',medina:'Madinah','madinah region':'Madinah','al madinah':'Madinah','al madinah region':'Madinah',المدينة:'Madinah','المدينة المنورة':'Madinah',
+  'eastern province':'Eastern Province',eastern:'Eastern Province','eastern region':'Eastern Province','eastern province region':'Eastern Province',الشرقية:'Eastern Province','المنطقة الشرقية':'Eastern Province',
+  qassim:'Al Qassim','al qassim':'Al Qassim',القصيم:'Al Qassim',asir:'Asir',aseer:'Asir',عسير:'Asir',tabuk:'Tabuk',تبوك:'Tabuk',hail:'Hail',حائل:'Hail',
+  'northern borders':'Northern Borders','northern border':'Northern Borders','الحدود الشمالية':'Northern Borders',jazan:'Jazan',jizan:'Jazan',جازان:'Jazan',
+  najran:'Najran',نجران:'Najran','al bahah':'Al Bahah',bahah:'Al Bahah',الباحة:'Al Bahah','al jouf':'Al Jouf',jouf:'Al Jouf',jawf:'Al Jouf',الجوف:'Al Jouf'
+};
+const CITY_TO_REGION = {
+  riyadh:'Riyadh',الخرج:'Riyadh','al kharj':'Riyadh',الدرعية:'Riyadh',diriyah:'Riyadh',
+  mecca:'Mecca',makkah:'Mecca',جدة:'Mecca',jeddah:'Mecca',الطائف:'Mecca',taif:'Mecca',
+  madinah:'Madinah',medina:'Madinah',ينبع:'Madinah',yanbu:'Madinah',
+  dammam:'Eastern Province',الدمام:'Eastern Province',khobar:'Eastern Province',الخبر:'Eastern Province','al khobar':'Eastern Province',dhahran:'Eastern Province',الظهران:'Eastern Province',
+  jubail:'Eastern Province',الجبيل:'Eastern Province',القطيف:'Eastern Province',qatif:'Eastern Province',الاحساء:'Eastern Province','al ahsa':'Eastern Province',hofuf:'Eastern Province',
+  بريدة:'Al Qassim',buraydah:'Al Qassim',عنيزة:'Al Qassim',unaizah:'Al Qassim'
+};
+function normalizeLookup(value){
+  return String(value || '').trim().toLowerCase().replace(/[()\[\],._-]/g,' ').replace(/\s+/g,' ');
+}
+function normalizeSaudiRegion(region){
+  const normalized = normalizeLookup(region);
+  if (!normalized) return '';
+  if (REGION_ALIASES[normalized]) return REGION_ALIASES[normalized];
+  return CANONICAL_REGIONS.find((item) => item.toLowerCase() === normalized) || '';
+}
+function resolveState(aiState, aiCity, rawCity){
+  const direct = normalizeSaudiRegion(aiState);
+  if (direct) return direct;
+  const aiCityRegion = CITY_TO_REGION[normalizeLookup(aiCity)];
+  if (aiCityRegion) return aiCityRegion;
+  return CITY_TO_REGION[normalizeLookup(rawCity)] || '';
+}
+function mapOrderData(raw, aiResults){
+  const aiMap = {};
+  for (const item of aiResults) aiMap[item.orderId] = item;
+  return raw.map((order) => {
+    const ai = aiMap[order.orderId] || {};
+    const extracted = extractFromAddress(order.address);
+    return {
+      COrderID: order.orderId,
+      FirstName: ai.firstName || '',
+      LastName: ai.lastName || '',
+      Address: ai.address || '',
+      Address2: ai.address2 || extracted.shortAddress || '',
+      City: ai.city || order.city || '',
+      State: resolveState(ai.state, ai.city, order.city),
+      Zip: ai.zip || extracted.zipCode || '',
+      Country: 'SA',
+      ShipMethod: 'Shipping',
+      Phone: formatPhone(order.phone),
+      OrderDetails: parseOrderDetails(order.products),
+      GiftWrap: 'n',
+      Message: ''
+    };
+  });
+}
+function filteredRows(){
+  const q = $('previewSearch').value.trim().toLowerCase();
+  if (!q) return outputRows;
+  return outputRows.filter((row) => CSV_HEADERS.some((key) => String(row[key] || '').toLowerCase().includes(q)));
+}
+function renderPreview(){
+  const rows = filteredRows();
+  $('previewPanel').classList.add('on');
+  $('previewCount').textContent = `${rows.length} طلب`;
+  if (outputRows.length === 0) {
+    $('tableWrap').innerHTML = '<div class="empty">لا توجد نتائج بعد.</div>';
+    return;
+  }
+  const head = CSV_HEADERS.map((header) => `<th>${header}</th>`).join('');
+  const body = rows.map((row, rowIndex) => {
+    const sourceIndex = outputRows.indexOf(row);
+    return `<tr>${CSV_HEADERS.map((header) => `<td><input value="${escapeHtml(row[header])}" oninput="editCell(${sourceIndex}, '${header}', this.value)"></td>`).join('')}</tr>`;
+  }).join('');
+  $('tableWrap').innerHTML = `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+function editCell(index, key, value){
+  if (!outputRows[index]) return;
+  outputRows[index][key] = value;
+}
+function escapeHtml(value){
+  return String(value ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function escapeCSVField(value){
+  const text = String(value ?? '');
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g,'""')}"` : text;
+}
+function csvText(){
+  const lines = [CSV_HEADERS.join(',')];
+  for (const row of outputRows) lines.push(CSV_HEADERS.map((header) => escapeCSVField(row[header])).join(','));
+  return lines.join('\n');
+}
+function downloadCSV(){
+  if (outputRows.length === 0) return;
+  const blob = new Blob([csvText()], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `prepared_orders_${new Date().toISOString().slice(0,10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+async function copyCSV(){
+  if (outputRows.length === 0) return;
+  await navigator.clipboard.writeText(csvText());
+  log('تم نسخ CSV إلى الحافظة.');
+}
+function clearResults(){
+  rawOrders = [];
+  outputRows = [];
+  $('previewPanel').classList.remove('on');
+  $('stats').style.display = 'none';
+  $('tableWrap').innerHTML = '';
+  $('logBox').innerHTML = '';
+  $('logBox').style.display = 'none';
+  setProgress(0);
+  checkReady();
+}
+loadSettings();
+setupDropZone();
+checkReady();
+</script>
+</body>
+</html>

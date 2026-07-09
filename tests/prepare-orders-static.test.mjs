@@ -1,0 +1,45 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+
+const indexHtml = fs.readFileSync('index.html', 'utf8');
+const newProductsHtml = fs.readFileSync('new-products.html', 'utf8');
+const fixOptionsHtml = fs.readFileSync('fix-options.html', 'utf8');
+const translateHtml = fs.readFileSync('translate-descriptions.html', 'utf8');
+const html = fs.readFileSync('prepare-orders.html', 'utf8');
+
+function has(pattern, message) {
+  assert.match(html, pattern, message);
+}
+
+assert.match(indexHtml, /prepare-orders\.html/, 'main page must link to the order preparation page');
+assert.match(newProductsHtml, /prepare-orders\.html/, 'new-products page must link to the order preparation page');
+assert.match(fixOptionsHtml, /prepare-orders\.html/, 'fix-options page must link to the order preparation page');
+assert.match(translateHtml, /prepare-orders\.html/, 'translation page must link to the order preparation page');
+
+has(/<h1>تجهيز الطلبات<\/h1>/, 'page must use the requested Arabic page name');
+has(/cdn\.jsdelivr\.net\/npm\/xlsx@/, 'page must load SheetJS for Salla order XLSX parsing');
+has(/id="provider"/, 'page must include an API provider selector');
+has(/value="openrouter"/, 'page must support OpenRouter');
+has(/value="deepseek"/, 'page must support DeepSeek');
+has(/id="accessToken"/, 'page must use the shared access token instead of exposing provider API keys');
+has(/localStorage\.setItem\(STORAGE_KEY/, 'page must optionally remember the access token locally');
+has(/\/api\/prepare-orders/, 'page must call the protected order preparation API route');
+assert.doesNotMatch(html, /id="apiKey"/, 'page must not expose a direct provider API key input');
+assert.doesNotMatch(html, /https:\/\/openrouter\.ai\/api\/v1\/chat\/completions/, 'page must not call OpenRouter directly from the browser');
+assert.doesNotMatch(html, /https:\/\/api\.deepseek\.com\/chat\/completions/, 'page must not call DeepSeek directly from the browser');
+has(/function\s+parseExcelFile/, 'page must parse the uploaded order workbook');
+has(/COL_|row\[18\]|row\[19\]|row\[20\]/, 'page must read the known Salla order columns including SKU, address, and products');
+has(/function\s+translateBatch/, 'page must translate orders through AI batches');
+has(/function\s+mapOrderData/, 'page must map raw orders and AI output into shipping rows');
+has(/function\s+parseOrderDetails/, 'page must convert product quantities to Qty,SKU details');
+has(/COrderID.*FirstName.*LastName.*Address.*OrderDetails/s, 'CSV headers must match the original order converter output');
+has(/function\s+downloadCSV/, 'page must export CSV');
+has(/function\s+renderPreview/, 'page must render an editable preview table');
+has(/prepared_orders_\$\{new Date\(\)\.toISOString\(\)\.slice\(0,10\)\}\.csv/, 'export filename must include the current date');
+
+const api = fs.readFileSync('api/prepare-orders.js', 'utf8');
+assert.match(api, /OPENROUTER_API_KEY/, 'server route must read the OpenRouter key from Vercel env');
+assert.match(api, /TRANSLATION_ACCESS_TOKEN/, 'server route must use the same translation access token');
+assert.match(api, /defaultProvider:\s*'openrouter'/, 'order preparation API must default to OpenRouter');
+assert.match(api, /https:\/\/openrouter\.ai\/api\/v1\/chat\/completions/, 'server route must support OpenRouter upstream calls');
+assert.match(api, /https:\/\/api\.deepseek\.com\/chat\/completions/, 'server route may still support DeepSeek upstream calls');
