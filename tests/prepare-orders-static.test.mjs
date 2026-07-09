@@ -30,6 +30,9 @@ assert.doesNotMatch(html, /https:\/\/api\.deepseek\.com\/chat\/completions/, 'pa
 has(/function\s+parseExcelFile/, 'page must parse the uploaded order workbook');
 has(/COL_|row\[18\]|row\[19\]|row\[20\]/, 'page must read the known Salla order columns including SKU, address, and products');
 has(/function\s+translateBatch/, 'page must translate orders through AI batches');
+has(/function\s+parsePrepareOrdersApiError/, 'page must translate protected API errors into useful Arabic messages');
+has(/رمز الدخول غير صحيح/, '401 access-token failures must show a clear Arabic message');
+has(/OPENROUTER_API_KEY/, 'missing OpenRouter env errors must tell the user which variable is missing');
 has(/function\s+mapOrderData/, 'page must map raw orders and AI output into shipping rows');
 has(/function\s+parseOrderDetails/, 'page must convert product quantities to Qty,SKU details');
 has(/COrderID.*FirstName.*LastName.*Address.*OrderDetails/s, 'CSV headers must match the original order converter output');

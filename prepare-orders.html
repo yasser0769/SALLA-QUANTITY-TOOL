@@ -335,7 +335,7 @@ async function translateBatch(orders, accessToken, provider, model){
     });
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(`API error (${response.status}): ${text.slice(0, 600)}`);
+      throw new Error(parsePrepareOrdersApiError(response.status, text));
     }
     const data = await response.json();
     if (!Array.isArray(data.results)) throw new Error('لم يرجع API نتائج صالحة');
@@ -346,6 +346,24 @@ async function translateBatch(orders, accessToken, provider, model){
   } finally {
     clearTimeout(timer);
   }
+}
+function parsePrepareOrdersApiError(status, text){
+  let message = '';
+  try {
+    message = JSON.parse(text)?.error || '';
+  } catch {
+    message = String(text || '');
+  }
+  if (status === 401 || /Invalid translation access token/i.test(message)) {
+    return 'رمز الدخول غير صحيح. أدخل نفس الرمز السري المستخدم في صفحات الترجمة، وليس مفتاح OpenRouter.';
+  }
+  if (/OPENROUTER_API_KEY/i.test(message)) {
+    return 'مفتاح OpenRouter غير مضاف في إعدادات Vercel. أضف OPENROUTER_API_KEY في Environment Variables ثم أعد النشر.';
+  }
+  if (/DEEPSEEK_API_KEY/i.test(message)) {
+    return 'مفتاح DeepSeek غير مضاف في إعدادات Vercel.';
+  }
+  return `خطأ من API (${status}): ${message.slice(0, 600)}`;
 }
 async function processOrders(){
   if (!orderFile) return;
