@@ -284,8 +284,8 @@ function estimateSaudiShippingUSD(items, weightsBySku = loadSkuWeights()) {
   const missingWeightSkus = [];
   for (const item of items) {
     matchedQuantity += item.quantity;
-    const weight = numberValue(weightsBySku[item.sku]);
-    if (weight > 0) {
+    if (Object.prototype.hasOwnProperty.call(weightsBySku, item.sku)) {
+      const weight = Math.max(0, numberValue(weightsBySku[item.sku]));
       totalGrams += weight * item.quantity;
     } else {
       totalGrams += DEFAULT_MISSING_WEIGHT_GRAMS * item.quantity;
@@ -293,10 +293,11 @@ function estimateSaudiShippingUSD(items, weightsBySku = loadSkuWeights()) {
     }
   }
   totalGrams = Math.max(0, Math.round(totalGrams));
-  if (matchedQuantity <= 0 || totalGrams <= 0) {
+  if (matchedQuantity <= 0) {
     return { shippingCostUSD: 0, totalGrams: 0, missingWeightSkus, shippingSource: 'weight_tiers' };
   }
-  const tier = SA_WEIGHT_SHIPPING_TIERS.find(row => totalGrams <= row.maxGrams);
+  const chargeableGrams = Math.max(1, totalGrams);
+  const tier = SA_WEIGHT_SHIPPING_TIERS.find(row => chargeableGrams <= row.maxGrams);
   if (tier) {
     return {
       shippingCostUSD: roundMoney(tier.rateUSD),

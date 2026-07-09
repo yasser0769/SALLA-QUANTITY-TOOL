@@ -150,6 +150,16 @@ assert.equal(fallbackShipping.results[3].status, 'missing_skus');
 assert.equal(fallbackShipping.results[3].shippingCostUSD, 18.95);
 assert.equal(fallbackShipping.results[3].landedCostSAR, 71.06);
 
+const sampleWeightShipping = costApi.estimateSaudiShippingUSD([
+  { sku: '563825', quantity: 1 },
+  { sku: '556705', quantity: 1 },
+  { sku: '571402', quantity: 1 }
+], { 563825: 400, 556705: 0, 571402: 0 });
+
+assert.equal(sampleWeightShipping.totalGrams, 400);
+assert.equal(sampleWeightShipping.shippingCostUSD, 14.95);
+assert.deepEqual(sampleWeightShipping.missingWeightSkus, []);
+
 try {
   process.env.FRAGRANCEX_API_ID = 'test-id';
   process.env.FRAGRANCEX_API_KEY = 'test-key';
