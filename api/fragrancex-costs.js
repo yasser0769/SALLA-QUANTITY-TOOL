@@ -7,6 +7,7 @@ const DEFAULT_USD_TO_SAR_RATE = 3.75;
 const CACHE_TTL_SECONDS = 60 * 60 * 30;
 
 let inMemoryToken = null;
+const memoryCache = new Map();
 
 function sendJson(response, statusCode, payload) {
   response.statusCode = statusCode;
@@ -56,16 +57,13 @@ function configuredUsdToSarRate() {
 function redisConfig() {
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) {
-    const error = new Error('تخزين Upstash Redis غير مهيأ في Vercel. أضف UPSTASH_REDIS_REST_URL و UPSTASH_REDIS_REST_TOKEN حتى يعمل كاش FragranceX اليومي.');
-    error.statusCode = 500;
-    throw error;
-  }
+  if (!url || !token) return null;
   return { url, token };
 }
 
 async function redisCommand(command) {
   const config = redisConfig();
+  if (!config) return null;
   const response = await fetch(config.url, {
     method: 'POST',
     headers: {
@@ -84,12 +82,23 @@ async function redisCommand(command) {
 
 async function readCache(key) {
   const data = await redisCommand(['GET', key]);
-  if (!data?.result) return null;
+  if (!data) {
+    const cached = memoryCache.get(key);
+    if (!cached || cached.expiresAt <= Date.now()) return null;
+    return cached.value;
+  }
+  if (!data.result) return null;
   return typeof data.result === 'string' ? JSON.parse(data.result) : data.result;
 }
 
 async function writeCache(key, value) {
-  await redisCommand(['SET', key, JSON.stringify(value), 'EX', CACHE_TTL_SECONDS]);
+  const data = await redisCommand(['SET', key, JSON.stringify(value), 'EX', CACHE_TTL_SECONDS]);
+  if (!data) {
+    memoryCache.set(key, {
+      value,
+      expiresAt: Date.now() + CACHE_TTL_SECONDS * 1000
+    });
+  }
 }
 
 function extractArray(payload, preferredKeys) {
@@ -307,6 +316,7 @@ async function handler(request, response) {
       ok: true,
       fragrancexConfigured: Boolean(process.env.FRAGRANCEX_API_ID && process.env.FRAGRANCEX_API_KEY),
       redisConfigured: Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN),
+      cacheMode: process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN ? 'upstash' : 'memory',
       accessTokenConfigured: Boolean(process.env.TRANSLATION_ACCESS_TOKEN),
       usdToSarRate: configuredUsdToSarRate()
     });
@@ -350,7 +360,8 @@ async function handler(request, response) {
       cache: {
         catalog: costData.catalog.cacheHit,
         shipping: costData.shipping.cacheHit,
-        vat: costData.vat.cacheHit
+        vat: costData.vat.cacheHit,
+        mode: process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN ? 'upstash' : 'memory'
       }
     });
   } catch (error) {

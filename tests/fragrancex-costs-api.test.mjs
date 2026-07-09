@@ -122,3 +122,48 @@ const calculated = costApi.calculateOrderCosts({
 
 assert.equal(calculated.results[0].vatCostUSD, 0, 'VAT must be exempt below ExceptionSubTotal');
 assert.equal(calculated.results[0].landedCostSAR, 172.5);
+
+try {
+  process.env.FRAGRANCEX_API_ID = 'test-id';
+  process.env.FRAGRANCEX_API_KEY = 'test-key';
+  process.env.TRANSLATION_ACCESS_TOKEN = 'shared-secret';
+  delete process.env.UPSTASH_REDIS_REST_URL;
+  delete process.env.UPSTASH_REDIS_REST_TOKEN;
+  process.env.USD_TO_SAR_RATE = '3.75';
+
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), options });
+    if (String(url) === 'https://apilisting.fragrancex.com/token') {
+      return { ok: true, json: async () => ({ access_token: 'memory-token', token_type: 'bearer', expires_in: 3600 }) };
+    }
+    assert.match(options.headers.Authorization, /^Bearer (memory-token|bearer-token)$/);
+    if (String(url) === 'https://apilisting.fragrancex.com/product/list/') {
+      return { ok: true, json: async () => ({ ListProduct: [{ ItemId: '444444', WholesalePriceUSD: 8 }] }) };
+    }
+    if (String(url) === 'https://apiordering.fragrancex.com/order/GetFixedShipping/') {
+      return { ok: true, json: async () => ({ FixedShippingCountry: [{ CountryCode: 'SA', ShippingRate: 10 }] }) };
+    }
+    if (String(url) === 'https://apiordering.fragrancex.com/order/GetVatCountries/') {
+      return { ok: true, json: async () => ({ VatCountry: [{ CountryCode: 'SA', VatRate: 0 }] }) };
+    }
+    throw new Error(`Unexpected fetch URL without Redis: ${url}`);
+  };
+
+  const response = responseMock();
+  await costApi(
+    requestMock({
+      countryCode: 'SA',
+      orders: [{ orderId: 'D400', totalValueSAR: 100, items: [{ sku: '444444', quantity: 1 }] }]
+    }, { 'x-translation-access-token': 'shared-secret' }),
+    response
+  );
+  const body = JSON.parse(response.body);
+  assert.equal(response.statusCode, 200);
+  assert.equal(body.cache.mode, 'memory', 'cost API must fall back to in-memory cache when Upstash is not configured');
+  assert.equal(body.results[0].landedCostSAR, 67.5);
+  assert.ok(!calls.some(call => call.url === 'https://redis.example'), 'no Redis call should be attempted without Upstash env');
+} finally {
+  global.fetch = oldFetch;
+  process.env = oldEnv;
+}

@@ -469,6 +469,14 @@ function applySupplierCosts(results){
     row.__supplierProfit = Number(cost.profitSAR) || 0;
     row.__supplierMissingSkus = Array.isArray(cost.missingSkus) ? cost.missingSkus : [];
     row.__supplierStatus = cost.status || '';
+    row.__supplierError = '';
+  }
+}
+function markSupplierCostError(message){
+  for (const row of outputRows) {
+    if (!row.__supplierItems?.length) continue;
+    row.__supplierStatus = 'error';
+    row.__supplierError = message;
   }
 }
 function parsePrepareOrdersApiError(status, text){
@@ -546,6 +554,7 @@ async function processOrders(){
         log(`تم حساب تكلفة المورد. SKUs ناقصة: ${missing}.`);
       }
     } catch (costError) {
+      markSupplierCostError(costError.message);
       log(`تنبيه تكلفة المورد: ${costError.message}`);
     }
     selectedOrderKeys.clear();
@@ -658,7 +667,8 @@ function mapOrderData(raw, aiResults){
       __supplierLandedCost: 0,
       __supplierProfit: 0,
       __supplierMissingSkus: [],
-      __supplierStatus: ''
+      __supplierStatus: '',
+      __supplierError: ''
     };
   });
 }
@@ -697,6 +707,9 @@ function formatCurrency(value){
 }
 function costStatusLabel(row){
   const missingSkus = Array.isArray(row.__supplierMissingSkus) ? row.__supplierMissingSkus : [];
+  if (row.__supplierStatus === 'error') {
+    return row.__supplierError || 'تعذر حساب تكلفة المورد';
+  }
   if (missingSkus.length) {
     return `SKU ناقص: ${missingSkus.map((item) => `${item.sku}×${item.quantity}`).join(', ')}`;
   }
