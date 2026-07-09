@@ -1,15 +1,29 @@
+const fs = require('node:fs');
+const path = require('node:path');
+
 const TOKEN_ENDPOINT = 'https://apilisting.fragrancex.com/token';
 const PRODUCT_LIST_ENDPOINT = 'https://apilisting.fragrancex.com/product/list/';
 const FIXED_SHIPPING_ENDPOINT = 'https://apiordering.fragrancex.com/order/GetFixedShipping/';
 const VAT_COUNTRIES_ENDPOINT = 'https://apiordering.fragrancex.com/order/GetVatCountries/';
 const DEFAULT_COUNTRY_CODE = 'SA';
 const DEFAULT_USD_TO_SAR_RATE = 3.75;
-const DEFAULT_INTERNATIONAL_SHIPPING_BASE_USD = 4.99;
-const DEFAULT_INTERNATIONAL_SHIPPING_ITEM_USD = 0.99;
+const DEFAULT_MISSING_WEIGHT_GRAMS = 500;
+const SA_WEIGHT_SHIPPING_TIERS = [
+  { maxGrams: 400, rateUSD: 14.95 },
+  { maxGrams: 900, rateUSD: 18.95 },
+  { maxGrams: 1200, rateUSD: 28.95 },
+  { maxGrams: 1800, rateUSD: 38.95 },
+  { maxGrams: 2000, rateUSD: 71.3511 },
+  { maxGrams: 2500, rateUSD: 82.5324 },
+  { maxGrams: 3000, rateUSD: 91.1161 },
+  { maxGrams: 5000, rateUSD: 104.6819 }
+];
+const HEAVY_SHIPPING_EXTRA_PER_500G_USD = 4;
 const CACHE_TTL_SECONDS = 60 * 60 * 30;
 
 let inMemoryToken = null;
 const memoryCache = new Map();
+let cachedWeights = null;
 
 function sendJson(response, statusCode, payload) {
   response.statusCode = statusCode;
@@ -54,15 +68,6 @@ function roundMoney(value) {
 function configuredUsdToSarRate() {
   const value = Number.parseFloat(process.env.USD_TO_SAR_RATE || '');
   return Number.isFinite(value) && value > 0 ? value : DEFAULT_USD_TO_SAR_RATE;
-}
-
-function configuredShippingFallback() {
-  const base = Number.parseFloat(process.env.FRAGRANCEX_SA_SHIPPING_BASE_USD || '');
-  const perItem = Number.parseFloat(process.env.FRAGRANCEX_SA_SHIPPING_ITEM_USD || '');
-  return {
-    baseUSD: Number.isFinite(base) && base >= 0 ? base : DEFAULT_INTERNATIONAL_SHIPPING_BASE_USD,
-    perItemUSD: Number.isFinite(perItem) && perItem >= 0 ? perItem : DEFAULT_INTERNATIONAL_SHIPPING_ITEM_USD
-  };
 }
 
 function redisConfig() {
@@ -204,6 +209,17 @@ function normalizeVatCountries(rows) {
   })).filter(row => row.countryCode || row.countryName);
 }
 
+function loadSkuWeights() {
+  if (cachedWeights) return cachedWeights;
+  const filePath = path.join(process.cwd(), 'data', 'fragrancex-weights.json');
+  try {
+    cachedWeights = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch (error) {
+    cachedWeights = {};
+  }
+  return cachedWeights;
+}
+
 async function cachedDataset(cacheName, loader) {
   const key = `fragrancex:${cacheName}:${todayKey()}`;
   const cached = await readCache(key);
@@ -262,33 +278,67 @@ function normalizeOrderItems(items) {
   return [...map.entries()].map(([sku, quantity]) => ({ sku, quantity }));
 }
 
-function calculateOrderCosts({ orders, catalog, shippingRows, vatRows, countryCode = DEFAULT_COUNTRY_CODE, usdToSarRate = DEFAULT_USD_TO_SAR_RATE }) {
+function estimateSaudiShippingUSD(items, weightsBySku = loadSkuWeights()) {
+  let totalGrams = 0;
+  let matchedQuantity = 0;
+  const missingWeightSkus = [];
+  for (const item of items) {
+    matchedQuantity += item.quantity;
+    const weight = numberValue(weightsBySku[item.sku]);
+    if (weight > 0) {
+      totalGrams += weight * item.quantity;
+    } else {
+      totalGrams += DEFAULT_MISSING_WEIGHT_GRAMS * item.quantity;
+      missingWeightSkus.push({ sku: item.sku, quantity: item.quantity });
+    }
+  }
+  totalGrams = Math.max(0, Math.round(totalGrams));
+  if (matchedQuantity <= 0 || totalGrams <= 0) {
+    return { shippingCostUSD: 0, totalGrams: 0, missingWeightSkus, shippingSource: 'weight_tiers' };
+  }
+  const tier = SA_WEIGHT_SHIPPING_TIERS.find(row => totalGrams <= row.maxGrams);
+  if (tier) {
+    return {
+      shippingCostUSD: roundMoney(tier.rateUSD),
+      totalGrams,
+      missingWeightSkus,
+      shippingSource: 'weight_tiers'
+    };
+  }
+  const lastTier = SA_WEIGHT_SHIPPING_TIERS[SA_WEIGHT_SHIPPING_TIERS.length - 1];
+  const extraBlocks = Math.ceil((totalGrams - lastTier.maxGrams) / 500);
+  return {
+    shippingCostUSD: roundMoney(lastTier.rateUSD + extraBlocks * HEAVY_SHIPPING_EXTRA_PER_500G_USD),
+    totalGrams,
+    missingWeightSkus,
+    shippingSource: 'weight_tiers_heavy_extension'
+  };
+}
+
+function calculateOrderCosts({ orders, catalog, shippingRows, vatRows, countryCode = DEFAULT_COUNTRY_CODE, usdToSarRate = DEFAULT_USD_TO_SAR_RATE, weightsBySku = loadSkuWeights() }) {
   const shippingRule = findCountryRow(shippingRows, countryCode);
   const vatRule = findCountryRow(vatRows, countryCode);
   const shippingRateUSD = shippingRule?.shippingRateUSD || 0;
-  const shippingFallback = configuredShippingFallback();
   const useEstimatedShipping = shippingRateUSD <= 0;
 
   const results = orders.map(order => {
     const items = normalizeOrderItems(order.items);
     const missingSkus = [];
+    const matchedItems = [];
     let productCostUSD = 0;
-    let matchedQuantity = 0;
     for (const item of items) {
       const product = catalog[item.sku];
       if (!product) {
         missingSkus.push({ sku: item.sku, quantity: item.quantity });
         continue;
       }
-      matchedQuantity += item.quantity;
+      matchedItems.push(item);
       productCostUSD += item.quantity * product.wholesalePriceUSD;
     }
     productCostUSD = roundMoney(productCostUSD);
-    const estimatedShippingUSD = matchedQuantity > 0
-      ? roundMoney(shippingFallback.baseUSD + shippingFallback.perItemUSD * matchedQuantity)
-      : 0;
+    const shippingEstimate = estimateSaudiShippingUSD(matchedItems, weightsBySku);
     const shippingCostUSD = productCostUSD > 0
-      ? roundMoney(useEstimatedShipping ? estimatedShippingUSD : shippingRateUSD)
+      ? roundMoney(useEstimatedShipping ? shippingEstimate.shippingCostUSD : shippingRateUSD)
       : 0;
     const vatCostUSD = vatAmountUSD(vatRule, productCostUSD + shippingCostUSD);
     const landedCostUSD = roundMoney(productCostUSD + shippingCostUSD + vatCostUSD);
@@ -298,9 +348,12 @@ function calculateOrderCosts({ orders, catalog, shippingRows, vatRows, countryCo
       orderId: String(order.orderId || ''),
       items,
       missingSkus,
+      missingWeightSkus: shippingEstimate.missingWeightSkus,
       productCostUSD,
       shippingCostUSD,
       shippingEstimated: productCostUSD > 0 && useEstimatedShipping,
+      shippingSource: useEstimatedShipping ? shippingEstimate.shippingSource : 'fixed_country',
+      shippingWeightGrams: useEstimatedShipping ? shippingEstimate.totalGrams : 0,
       vatCostUSD,
       landedCostUSD,
       productCostSAR: roundMoney(productCostUSD * usdToSarRate),
@@ -317,8 +370,8 @@ function calculateOrderCosts({ orders, catalog, shippingRows, vatRows, countryCo
     sourceCurrency: 'USD',
     usdToSarRate,
     shippingRateUSD,
-    shippingSource: useEstimatedShipping ? 'international_estimate' : 'fixed_country',
-    shippingEstimateUSD: shippingFallback,
+    shippingSource: useEstimatedShipping ? 'weight_tiers' : 'fixed_country',
+    shippingTiers: SA_WEIGHT_SHIPPING_TIERS,
     vatRate: vatRule?.vatRate || 0,
     results,
     totals: results.reduce((totals, row) => {
@@ -328,8 +381,9 @@ function calculateOrderCosts({ orders, catalog, shippingRows, vatRows, countryCo
       totals.landedCostSAR = roundMoney(totals.landedCostSAR + row.landedCostSAR);
       totals.profitSAR = roundMoney(totals.profitSAR + row.profitSAR);
       totals.missingSkuCount += row.missingSkus.length;
+      totals.missingWeightCount += row.missingWeightSkus.length;
       return totals;
-    }, { productCostSAR: 0, shippingCostSAR: 0, vatCostSAR: 0, landedCostSAR: 0, profitSAR: 0, missingSkuCount: 0 })
+    }, { productCostSAR: 0, shippingCostSAR: 0, vatCostSAR: 0, landedCostSAR: 0, profitSAR: 0, missingSkuCount: 0, missingWeightCount: 0 })
   };
 }
 
@@ -341,6 +395,7 @@ async function handler(request, response) {
       redisConfigured: Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN),
       cacheMode: process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN ? 'upstash' : 'memory',
       accessTokenConfigured: Boolean(process.env.TRANSLATION_ACCESS_TOKEN),
+      skuWeightsConfigured: Object.keys(loadSkuWeights()).length,
       usdToSarRate: configuredUsdToSarRate()
     });
   }
@@ -400,3 +455,4 @@ module.exports.normalizeProductCatalog = normalizeProductCatalog;
 module.exports.normalizeShippingCountries = normalizeShippingCountries;
 module.exports.normalizeVatCountries = normalizeVatCountries;
 module.exports.vatAmountUSD = vatAmountUSD;
+module.exports.estimateSaudiShippingUSD = estimateSaudiShippingUSD;

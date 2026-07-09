@@ -86,6 +86,8 @@ assert.match(costApi, /https:\/\/apilisting\.fragrancex\.com\/product\/list\//, 
 assert.match(costApi, /https:\/\/apiordering\.fragrancex\.com\/order\/GetFixedShipping\//, 'cost API must load fixed shipping countries');
 assert.match(costApi, /https:\/\/apiordering\.fragrancex\.com\/order\/GetVatCountries\//, 'cost API must load VAT countries');
 assert.match(costApi, /WholesalePriceUSD/, 'cost API must use FragranceX wholesale USD prices');
+assert.match(costApi, /fragrancex-weights\.json/, 'cost API must use local SKU weights for Saudi shipping estimates');
+assert.match(costApi, /SA_WEIGHT_SHIPPING_TIERS/, 'cost API must price Saudi shipping with inferred weight tiers');
 assert.match(costApi, /USD_TO_SAR_RATE/, 'cost API must convert FragranceX USD costs into SAR values');
 assert.doesNotMatch(costApi, /FRAGRANCEX_API_KEY\s*=\s*['"][^'"]+['"]/, 'cost API must not contain a hard-coded FragranceX API key');
 assert.doesNotMatch(costApi, /FRAGRANCEX_API_ID\s*=\s*['"][^'"]+['"]/, 'cost API must not contain a hard-coded FragranceX API ID');

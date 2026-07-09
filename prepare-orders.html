@@ -470,7 +470,9 @@ function applySupplierCosts(results){
     row.__supplierLandedCost = Number(cost.landedCostSAR) || 0;
     row.__supplierProfit = Number(cost.profitSAR) || 0;
     row.__supplierShippingEstimated = Boolean(cost.shippingEstimated);
+    row.__supplierShippingWeightGrams = Number(cost.shippingWeightGrams) || 0;
     row.__supplierMissingSkus = Array.isArray(cost.missingSkus) ? cost.missingSkus : [];
+    row.__supplierMissingWeightSkus = Array.isArray(cost.missingWeightSkus) ? cost.missingWeightSkus : [];
     row.__supplierStatus = cost.status || '';
     row.__supplierError = '';
   }
@@ -555,10 +557,12 @@ async function processOrders(){
       const costData = await fetchSupplierCosts(outputRows, accessToken);
       if (costData) {
         const missing = costData.totals?.missingSkuCount || 0;
-        if (costData.shippingSource === 'international_estimate') {
-          const base = costData.shippingEstimateUSD?.baseUSD ?? 4.99;
-          const perItem = costData.shippingEstimateUSD?.perItemUSD ?? 0.99;
-          log(`تنبيه: لم يرجع FragranceX شحن ثابت للسعودية، تم استخدام شحن تقديري (${base}$ + ${perItem}$ لكل قطعة).`);
+        const missingWeights = costData.totals?.missingWeightCount || 0;
+        if (costData.shippingSource === 'weight_tiers') {
+          log('تم حساب الشحن حسب الوزن والكمية من شرائح مستنتجة من سجل طلبات FragranceX.');
+        }
+        if (missingWeights > 0) {
+          log(`تنبيه: ${missingWeights} SKU بدون وزن، تم تقدير وزنها بـ 500g للقطعة.`);
         }
         log(`تم حساب تكلفة المورد. SKUs ناقصة: ${missing}.`);
       }
@@ -676,7 +680,9 @@ function mapOrderData(raw, aiResults){
       __supplierLandedCost: 0,
       __supplierProfit: 0,
       __supplierShippingEstimated: false,
+      __supplierShippingWeightGrams: 0,
       __supplierMissingSkus: [],
+      __supplierMissingWeightSkus: [],
       __supplierStatus: '',
       __supplierError: ''
     };
@@ -717,13 +723,17 @@ function formatCurrency(value){
 }
 function costStatusLabel(row){
   const missingSkus = Array.isArray(row.__supplierMissingSkus) ? row.__supplierMissingSkus : [];
+  const missingWeightSkus = Array.isArray(row.__supplierMissingWeightSkus) ? row.__supplierMissingWeightSkus : [];
   if (row.__supplierStatus === 'error') {
     return row.__supplierError || 'تعذر حساب تكلفة المورد';
   }
   if (missingSkus.length) {
     return `SKU ناقص: ${missingSkus.map((item) => `${item.sku}×${item.quantity}`).join(', ')}`;
   }
-  if (row.__supplierStatus === 'ok') return row.__supplierShippingEstimated ? 'مطابق، الشحن تقديري' : 'مطابق';
+  if (missingWeightSkus.length) {
+    return `مطابق، وزن تقديري: ${missingWeightSkus.map((item) => `${item.sku}×${item.quantity}`).join(', ')}`;
+  }
+  if (row.__supplierStatus === 'ok') return row.__supplierShippingEstimated ? 'مطابق، شحن وزن/كمية' : 'مطابق';
   if (row.__supplierItems?.length) return 'لم تحسب';
   return 'بدون SKU';
 }
@@ -742,8 +752,8 @@ function costPreviewCells(row){
 function renderPreview(){
   const rows = filteredRows();
   const totals = supplierTotals();
-  const shippingEstimateNote = supplierCostMeta?.shippingSource === 'international_estimate'
-    ? ' <span class="pill warn">الشحن تقديري</span>'
+  const shippingEstimateNote = supplierCostMeta?.shippingSource === 'weight_tiers'
+    ? ' <span class="pill warn">الشحن وزن/كمية</span>'
     : '';
   $('previewPanel').classList.add('on');
   $('previewCount').textContent = `${rows.length} ظاهر`;

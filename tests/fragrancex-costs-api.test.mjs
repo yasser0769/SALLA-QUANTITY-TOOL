@@ -124,17 +124,27 @@ assert.equal(calculated.results[0].vatCostUSD, 0, 'VAT must be exempt below Exce
 assert.equal(calculated.results[0].landedCostSAR, 172.5);
 
 const fallbackShipping = costApi.calculateOrderCosts({
-  orders: [{ orderId: 'S400', totalValueSAR: 200, items: [{ sku: '555555', quantity: 2 }] }],
-  catalog: { 555555: { wholesalePriceUSD: 10 } },
+  orders: [
+    { orderId: 'S400', totalValueSAR: 200, items: [{ sku: '555555', quantity: 1 }] },
+    { orderId: 'S900', totalValueSAR: 200, items: [{ sku: '555555', quantity: 1 }, { sku: '666666', quantity: 1 }] },
+    { orderId: 'S1200', totalValueSAR: 200, items: [{ sku: '777777', quantity: 3 }] }
+  ],
+  catalog: { 555555: { wholesalePriceUSD: 10 }, 666666: { wholesalePriceUSD: 5 }, 777777: { wholesalePriceUSD: 3 } },
   shippingRows: [{ countryCode: 'US', shippingRateUSD: 6.95 }],
   vatRows: [{ countryCode: 'SA', minSubTotalUSD: 0, maxSubTotalUSD: 0, exceptionSubTotalUSD: 0, vatRate: 0 }],
-  usdToSarRate: 3.75
+  usdToSarRate: 3.75,
+  weightsBySku: { 555555: 400, 666666: 500, 777777: 400 }
 });
 
-assert.equal(fallbackShipping.shippingSource, 'international_estimate');
+assert.equal(fallbackShipping.shippingSource, 'weight_tiers');
 assert.equal(fallbackShipping.results[0].shippingEstimated, true);
-assert.equal(fallbackShipping.results[0].shippingCostUSD, 6.97);
-assert.equal(fallbackShipping.results[0].landedCostSAR, 101.14);
+assert.equal(fallbackShipping.results[0].shippingCostUSD, 14.95);
+assert.equal(fallbackShipping.results[0].shippingWeightGrams, 400);
+assert.equal(fallbackShipping.results[0].landedCostSAR, 93.56);
+assert.equal(fallbackShipping.results[1].shippingCostUSD, 18.95);
+assert.equal(fallbackShipping.results[1].shippingWeightGrams, 900);
+assert.equal(fallbackShipping.results[2].shippingCostUSD, 28.95);
+assert.equal(fallbackShipping.results[2].shippingWeightGrams, 1200);
 
 try {
   process.env.FRAGRANCEX_API_ID = 'test-id';
