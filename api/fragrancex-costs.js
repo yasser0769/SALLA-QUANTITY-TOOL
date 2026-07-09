@@ -4,6 +4,8 @@ const FIXED_SHIPPING_ENDPOINT = 'https://apiordering.fragrancex.com/order/GetFix
 const VAT_COUNTRIES_ENDPOINT = 'https://apiordering.fragrancex.com/order/GetVatCountries/';
 const DEFAULT_COUNTRY_CODE = 'SA';
 const DEFAULT_USD_TO_SAR_RATE = 3.75;
+const DEFAULT_INTERNATIONAL_SHIPPING_BASE_USD = 4.99;
+const DEFAULT_INTERNATIONAL_SHIPPING_ITEM_USD = 0.99;
 const CACHE_TTL_SECONDS = 60 * 60 * 30;
 
 let inMemoryToken = null;
@@ -52,6 +54,15 @@ function roundMoney(value) {
 function configuredUsdToSarRate() {
   const value = Number.parseFloat(process.env.USD_TO_SAR_RATE || '');
   return Number.isFinite(value) && value > 0 ? value : DEFAULT_USD_TO_SAR_RATE;
+}
+
+function configuredShippingFallback() {
+  const base = Number.parseFloat(process.env.FRAGRANCEX_SA_SHIPPING_BASE_USD || '');
+  const perItem = Number.parseFloat(process.env.FRAGRANCEX_SA_SHIPPING_ITEM_USD || '');
+  return {
+    baseUSD: Number.isFinite(base) && base >= 0 ? base : DEFAULT_INTERNATIONAL_SHIPPING_BASE_USD,
+    perItemUSD: Number.isFinite(perItem) && perItem >= 0 ? perItem : DEFAULT_INTERNATIONAL_SHIPPING_ITEM_USD
+  };
 }
 
 function redisConfig() {
@@ -255,21 +266,30 @@ function calculateOrderCosts({ orders, catalog, shippingRows, vatRows, countryCo
   const shippingRule = findCountryRow(shippingRows, countryCode);
   const vatRule = findCountryRow(vatRows, countryCode);
   const shippingRateUSD = shippingRule?.shippingRateUSD || 0;
+  const shippingFallback = configuredShippingFallback();
+  const useEstimatedShipping = shippingRateUSD <= 0;
 
   const results = orders.map(order => {
     const items = normalizeOrderItems(order.items);
     const missingSkus = [];
     let productCostUSD = 0;
+    let matchedQuantity = 0;
     for (const item of items) {
       const product = catalog[item.sku];
       if (!product) {
         missingSkus.push({ sku: item.sku, quantity: item.quantity });
         continue;
       }
+      matchedQuantity += item.quantity;
       productCostUSD += item.quantity * product.wholesalePriceUSD;
     }
     productCostUSD = roundMoney(productCostUSD);
-    const shippingCostUSD = productCostUSD > 0 ? shippingRateUSD : 0;
+    const estimatedShippingUSD = matchedQuantity > 0
+      ? roundMoney(shippingFallback.baseUSD + shippingFallback.perItemUSD * matchedQuantity)
+      : 0;
+    const shippingCostUSD = productCostUSD > 0
+      ? roundMoney(useEstimatedShipping ? estimatedShippingUSD : shippingRateUSD)
+      : 0;
     const vatCostUSD = vatAmountUSD(vatRule, productCostUSD + shippingCostUSD);
     const landedCostUSD = roundMoney(productCostUSD + shippingCostUSD + vatCostUSD);
     const landedCostSAR = roundMoney(landedCostUSD * usdToSarRate);
@@ -280,6 +300,7 @@ function calculateOrderCosts({ orders, catalog, shippingRows, vatRows, countryCo
       missingSkus,
       productCostUSD,
       shippingCostUSD,
+      shippingEstimated: productCostUSD > 0 && useEstimatedShipping,
       vatCostUSD,
       landedCostUSD,
       productCostSAR: roundMoney(productCostUSD * usdToSarRate),
@@ -296,6 +317,8 @@ function calculateOrderCosts({ orders, catalog, shippingRows, vatRows, countryCo
     sourceCurrency: 'USD',
     usdToSarRate,
     shippingRateUSD,
+    shippingSource: useEstimatedShipping ? 'international_estimate' : 'fixed_country',
+    shippingEstimateUSD: shippingFallback,
     vatRate: vatRule?.vatRate || 0,
     results,
     totals: results.reduce((totals, row) => {

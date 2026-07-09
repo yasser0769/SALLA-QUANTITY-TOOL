@@ -123,6 +123,19 @@ const calculated = costApi.calculateOrderCosts({
 assert.equal(calculated.results[0].vatCostUSD, 0, 'VAT must be exempt below ExceptionSubTotal');
 assert.equal(calculated.results[0].landedCostSAR, 172.5);
 
+const fallbackShipping = costApi.calculateOrderCosts({
+  orders: [{ orderId: 'S400', totalValueSAR: 200, items: [{ sku: '555555', quantity: 2 }] }],
+  catalog: { 555555: { wholesalePriceUSD: 10 } },
+  shippingRows: [{ countryCode: 'US', shippingRateUSD: 6.95 }],
+  vatRows: [{ countryCode: 'SA', minSubTotalUSD: 0, maxSubTotalUSD: 0, exceptionSubTotalUSD: 0, vatRate: 0 }],
+  usdToSarRate: 3.75
+});
+
+assert.equal(fallbackShipping.shippingSource, 'international_estimate');
+assert.equal(fallbackShipping.results[0].shippingEstimated, true);
+assert.equal(fallbackShipping.results[0].shippingCostUSD, 6.97);
+assert.equal(fallbackShipping.results[0].landedCostSAR, 101.14);
+
 try {
   process.env.FRAGRANCEX_API_ID = 'test-id';
   process.env.FRAGRANCEX_API_KEY = 'test-key';

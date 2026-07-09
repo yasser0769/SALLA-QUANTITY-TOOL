@@ -208,6 +208,7 @@ let orderFile = null;
 let rawOrders = [];
 let outputRows = [];
 let selectedOrderKeys = new Set();
+let supplierCostMeta = null;
 let processing = false;
 
 function $(id){return document.getElementById(id)}
@@ -454,6 +455,7 @@ async function fetchSupplierCosts(rows, accessToken){
   }
   const data = await response.json();
   if (!Array.isArray(data.results)) throw new Error('لم يرجع API تكلفة المورد بشكل صالح');
+  supplierCostMeta = data;
   applySupplierCosts(data.results);
   return data;
 }
@@ -467,6 +469,7 @@ function applySupplierCosts(results){
     row.__supplierVatCost = Number(cost.vatCostSAR) || 0;
     row.__supplierLandedCost = Number(cost.landedCostSAR) || 0;
     row.__supplierProfit = Number(cost.profitSAR) || 0;
+    row.__supplierShippingEstimated = Boolean(cost.shippingEstimated);
     row.__supplierMissingSkus = Array.isArray(cost.missingSkus) ? cost.missingSkus : [];
     row.__supplierStatus = cost.status || '';
     row.__supplierError = '';
@@ -524,6 +527,7 @@ async function processOrders(){
   }
   processing = true;
   outputRows = [];
+  supplierCostMeta = null;
   checkReady();
   $('logBox').innerHTML = '';
   setProgress(4);
@@ -551,6 +555,11 @@ async function processOrders(){
       const costData = await fetchSupplierCosts(outputRows, accessToken);
       if (costData) {
         const missing = costData.totals?.missingSkuCount || 0;
+        if (costData.shippingSource === 'international_estimate') {
+          const base = costData.shippingEstimateUSD?.baseUSD ?? 4.99;
+          const perItem = costData.shippingEstimateUSD?.perItemUSD ?? 0.99;
+          log(`تنبيه: لم يرجع FragranceX شحن ثابت للسعودية، تم استخدام شحن تقديري (${base}$ + ${perItem}$ لكل قطعة).`);
+        }
         log(`تم حساب تكلفة المورد. SKUs ناقصة: ${missing}.`);
       }
     } catch (costError) {
@@ -666,6 +675,7 @@ function mapOrderData(raw, aiResults){
       __supplierVatCost: 0,
       __supplierLandedCost: 0,
       __supplierProfit: 0,
+      __supplierShippingEstimated: false,
       __supplierMissingSkus: [],
       __supplierStatus: '',
       __supplierError: ''
@@ -713,7 +723,7 @@ function costStatusLabel(row){
   if (missingSkus.length) {
     return `SKU ناقص: ${missingSkus.map((item) => `${item.sku}×${item.quantity}`).join(', ')}`;
   }
-  if (row.__supplierStatus === 'ok') return 'مطابق';
+  if (row.__supplierStatus === 'ok') return row.__supplierShippingEstimated ? 'مطابق، الشحن تقديري' : 'مطابق';
   if (row.__supplierItems?.length) return 'لم تحسب';
   return 'بدون SKU';
 }
@@ -732,9 +742,12 @@ function costPreviewCells(row){
 function renderPreview(){
   const rows = filteredRows();
   const totals = supplierTotals();
+  const shippingEstimateNote = supplierCostMeta?.shippingSource === 'international_estimate'
+    ? ' <span class="pill warn">الشحن تقديري</span>'
+    : '';
   $('previewPanel').classList.add('on');
   $('previewCount').textContent = `${rows.length} ظاهر`;
-  $('orderTotalSummary').innerHTML = `إجمالي قيمة الطلبات: <span class="pill ok">${formatCurrency(orderTotalValue())}</span> تكلفة المورد: <span class="pill warn">${formatCurrency(totals.product)}</span> الشحن: <span class="pill warn">${formatCurrency(totals.shipping)}</span> VAT: <span class="pill warn">${formatCurrency(totals.vat)}</span> تكلفة الوصول: <span class="pill warn">${formatCurrency(totals.landed)}</span> الربح المتوقع: <span class="pill ${totals.profit >= 0 ? 'ok' : 'bad'}">${formatCurrency(totals.profit)}</span> الطلبات: <span class="pill ok">${outputRows.length}</span> المحدد: <span class="pill warn">${selectedOrderKeys.size}</span>${totals.missing ? ` <span class="pill bad">SKU ناقص ${totals.missing}</span>` : ''}`;
+  $('orderTotalSummary').innerHTML = `إجمالي قيمة الطلبات: <span class="pill ok">${formatCurrency(orderTotalValue())}</span> تكلفة المورد: <span class="pill warn">${formatCurrency(totals.product)}</span> الشحن: <span class="pill warn">${formatCurrency(totals.shipping)}</span>${shippingEstimateNote} VAT: <span class="pill warn">${formatCurrency(totals.vat)}</span> تكلفة الوصول: <span class="pill warn">${formatCurrency(totals.landed)}</span> الربح المتوقع: <span class="pill ${totals.profit >= 0 ? 'ok' : 'bad'}">${formatCurrency(totals.profit)}</span> الطلبات: <span class="pill ok">${outputRows.length}</span> المحدد: <span class="pill warn">${selectedOrderKeys.size}</span>${totals.missing ? ` <span class="pill bad">SKU ناقص ${totals.missing}</span>` : ''}`;
   if (outputRows.length === 0) {
     $('tableWrap').innerHTML = '<div class="empty">لا توجد نتائج بعد.</div>';
     updateSelectionUi(rows);
