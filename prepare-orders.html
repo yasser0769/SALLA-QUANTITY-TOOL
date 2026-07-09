@@ -69,7 +69,7 @@ h1{font-size:clamp(1.55rem,3vw,2.1rem);font-weight:700;margin-bottom:8px}
 .panel.on{display:block}
 .panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
 .panel h2{font-size:1.05rem}
-.preview-tools{display:grid;grid-template-columns:minmax(220px,1fr) auto auto;gap:8px;margin-bottom:12px;align-items:center}
+.preview-tools{display:grid;grid-template-columns:minmax(220px,1fr) auto auto auto;gap:8px;margin-bottom:12px;align-items:center}
 .search{width:100%;padding:10px 12px;background:#ffffff;border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;outline:none;min-height:42px}
 @media(max-width:760px){.preview-tools{grid-template-columns:1fr}.actions .btn{width:100%}}
 .table-wrap{background:#fff;border:1px solid var(--border);border-radius:var(--radius);overflow:auto;max-height:62vh;box-shadow:var(--shadow)}
@@ -80,6 +80,9 @@ td{padding:7px 8px;border-bottom:1px solid rgba(219,227,237,.78);white-space:now
 tr:hover td{background:rgba(15,118,110,.045)}
 td input{width:100%;min-width:90px;border:1px solid transparent;background:transparent;border-radius:6px;padding:6px 7px;font-family:inherit;font-size:.74rem;color:var(--text);outline:none}
 td input:focus{border-color:rgba(15,118,110,.45);background:#fff;box-shadow:0 0 0 3px rgba(15,118,110,.1)}
+.row-select-cell{width:46px;min-width:46px;text-align:center}
+.row-select-cell input{width:18px;min-width:18px;height:18px;accent-color:var(--accent);cursor:pointer}
+.summary-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--text2);font-size:.82rem;font-weight:800}
 .pill{display:inline-block;padding:2px 8px;border-radius:5px;font-size:.68rem;font-weight:800}
 .ok{background:var(--green-dim);color:var(--green)}
 .warn{background:var(--amber-dim);color:var(--amber)}
@@ -160,13 +163,17 @@ td input:focus{border-color:rgba(15,118,110,.45);background:#fff;box-shadow:0 0 
 
   <section class="panel" id="previewPanel">
     <div class="panel-head">
-      <h2>مراجعة ملف الشحن</h2>
-      <span class="pill ok" id="previewCount">0 طلب</span>
+      <div>
+        <h2>مراجعة ملف الشحن</h2>
+        <div class="summary-line" id="orderTotalSummary">الإجمالي: 0 طلب</div>
+      </div>
+      <span class="pill ok" id="previewCount">0 ظاهر</span>
     </div>
     <div class="preview-tools">
       <input class="search" id="previewSearch" type="search" placeholder="بحث في رقم الطلب، الاسم، المدينة، الجوال، أو SKU..." oninput="renderPreview()">
       <button class="btn" onclick="downloadCSV()">تحميل CSV</button>
       <button class="btn" onclick="copyCSV()">نسخ CSV</button>
+      <button class="btn" id="deleteSelectedBtn" onclick="deleteSelectedOrders()" disabled>حذف المحدد</button>
     </div>
     <div class="table-wrap" id="tableWrap"></div>
   </section>
@@ -195,6 +202,7 @@ const MODEL_OPTIONS = {
 let orderFile = null;
 let rawOrders = [];
 let outputRows = [];
+let selectedOrderKeys = new Set();
 let processing = false;
 
 function $(id){return document.getElementById(id)}
@@ -243,6 +251,8 @@ function toggleAccessToken(){
 function checkReady(){
   $('processBtn').disabled = processing || !orderFile;
   $('exportBtn').disabled = outputRows.length === 0;
+  const deleteButton = $('deleteSelectedBtn');
+  if (deleteButton) deleteButton.disabled = selectedOrderKeys.size === 0;
 }
 function loadOrderFile(event){
   const file = event.target.files?.[0];
@@ -250,6 +260,7 @@ function loadOrderFile(event){
   orderFile = file;
   rawOrders = [];
   outputRows = [];
+  selectedOrderKeys.clear();
   $('fileInfo').textContent = file.name;
   $('orderZone').classList.add('ok');
   $('previewPanel').classList.remove('on');
@@ -395,7 +406,8 @@ async function processOrders(){
       aiResults.push(...translated);
       setProgress(10 + Math.round((Math.min(start + batchSize, rawOrders.length) / rawOrders.length) * 80));
     }
-    outputRows = mapOrderData(rawOrders, aiResults);
+    outputRows = withRowKeys(mapOrderData(rawOrders, aiResults));
+    selectedOrderKeys.clear();
     $('stConverted').textContent = outputRows.length;
     $('stMissingState').textContent = outputRows.filter((row) => !row.State).length;
     $('stMissingDetails').textContent = outputRows.filter((row) => !row.OrderDetails).length;
@@ -488,32 +500,87 @@ function mapOrderData(raw, aiResults){
     };
   });
 }
+function withRowKeys(rows){
+  return rows.map((row, index) => ({
+    ...row,
+    __rowKey: `${row.COrderID || 'order'}::${index}`
+  }));
+}
 function filteredRows(){
   const q = $('previewSearch').value.trim().toLowerCase();
   if (!q) return outputRows;
   return outputRows.filter((row) => CSV_HEADERS.some((key) => String(row[key] || '').toLowerCase().includes(q)));
 }
+function updateOrderCounters(){
+  $('stConverted').textContent = outputRows.length;
+  $('stMissingState').textContent = outputRows.filter((row) => !row.State).length;
+  $('stMissingDetails').textContent = outputRows.filter((row) => !row.OrderDetails).length;
+}
 function renderPreview(){
   const rows = filteredRows();
   $('previewPanel').classList.add('on');
-  $('previewCount').textContent = `${rows.length} طلب`;
+  $('previewCount').textContent = `${rows.length} ظاهر`;
+  $('orderTotalSummary').innerHTML = `الإجمالي: <span class="pill ok">${outputRows.length} طلب</span> المحدد: <span class="pill warn">${selectedOrderKeys.size}</span>`;
   if (outputRows.length === 0) {
     $('tableWrap').innerHTML = '<div class="empty">لا توجد نتائج بعد.</div>';
+    updateSelectionUi(rows);
     return;
   }
-  const head = CSV_HEADERS.map((header) => `<th>${header}</th>`).join('');
-  const body = rows.map((row, rowIndex) => {
+  const head = `<th class="row-select-cell"><input id="selectVisibleRows" type="checkbox" title="تحديد كل الطلبات الظاهرة" onchange="toggleVisibleSelection(this.checked)"></th>` + CSV_HEADERS.map((header) => `<th>${header}</th>`).join('');
+  const body = rows.map((row) => {
     const sourceIndex = outputRows.indexOf(row);
-    return `<tr>${CSV_HEADERS.map((header) => `<td><input value="${escapeHtml(row[header])}" oninput="editCell(${sourceIndex}, '${header}', this.value)"></td>`).join('')}</tr>`;
+    const checked = selectedOrderKeys.has(row.__rowKey) ? 'checked' : '';
+    return `<tr><td class="row-select-cell"><input type="checkbox" ${checked} onchange="toggleOrderSelection(${jsArg(row.__rowKey)}, this.checked)"></td>${CSV_HEADERS.map((header) => `<td><input value="${escapeHtml(row[header])}" oninput="editCell(${sourceIndex}, '${header}', this.value)"></td>`).join('')}</tr>`;
   }).join('');
   $('tableWrap').innerHTML = `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+  updateSelectionUi(rows);
 }
 function editCell(index, key, value){
   if (!outputRows[index]) return;
   outputRows[index][key] = value;
 }
+function toggleOrderSelection(rowKey, checked){
+  if (checked) selectedOrderKeys.add(rowKey);
+  else selectedOrderKeys.delete(rowKey);
+  renderPreview();
+}
+function toggleVisibleSelection(checked){
+  for (const row of filteredRows()) {
+    if (checked) selectedOrderKeys.add(row.__rowKey);
+    else selectedOrderKeys.delete(row.__rowKey);
+  }
+  renderPreview();
+}
+function updateSelectionUi(rows){
+  const visibleKeys = rows.map((row) => row.__rowKey);
+  const selectedVisible = visibleKeys.filter((key) => selectedOrderKeys.has(key)).length;
+  const selectAll = $('selectVisibleRows');
+  if (selectAll) {
+    selectAll.checked = visibleKeys.length > 0 && selectedVisible === visibleKeys.length;
+    selectAll.indeterminate = selectedVisible > 0 && selectedVisible < visibleKeys.length;
+  }
+  const deleteButton = $('deleteSelectedBtn');
+  if (deleteButton) {
+    deleteButton.disabled = selectedOrderKeys.size === 0;
+    deleteButton.textContent = selectedOrderKeys.size ? `حذف المحدد (${selectedOrderKeys.size})` : 'حذف المحدد';
+  }
+}
+function deleteSelectedOrders(){
+  if (selectedOrderKeys.size === 0) return;
+  const count = selectedOrderKeys.size;
+  if (!confirm(`حذف ${count} طلب من جدول التجهيز؟`)) return;
+  outputRows = outputRows.filter((row) => !selectedOrderKeys.has(row.__rowKey));
+  selectedOrderKeys.clear();
+  updateOrderCounters();
+  checkReady();
+  renderPreview();
+  log(`تم حذف ${count} طلب من جدول التجهيز.`);
+}
 function escapeHtml(value){
   return String(value ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function jsArg(value){
+  return escapeHtml(JSON.stringify(value));
 }
 function escapeCSVField(value){
   const text = String(value ?? '');
@@ -542,6 +609,7 @@ async function copyCSV(){
 function clearResults(){
   rawOrders = [];
   outputRows = [];
+  selectedOrderKeys.clear();
   $('previewPanel').classList.remove('on');
   $('stats').style.display = 'none';
   $('tableWrap').innerHTML = '';

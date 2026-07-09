@@ -38,6 +38,15 @@ has(/function\s+parseOrderDetails/, 'page must convert product quantities to Qty
 has(/COrderID.*FirstName.*LastName.*Address.*OrderDetails/s, 'CSV headers must match the original order converter output');
 has(/function\s+downloadCSV/, 'page must export CSV');
 has(/function\s+renderPreview/, 'page must render an editable preview table');
+has(/id="orderTotalSummary"/, 'preview must show total order count above the table');
+has(/الإجمالي:/, 'preview total must use a visible Arabic label');
+has(/selectedOrderKeys\s*=\s*new Set\(\)/, 'page must track selected orders separately from CSV data');
+has(/id="selectVisibleRows"/, 'preview table must support selecting all visible rows');
+has(/function\s+toggleOrderSelection/, 'page must support selecting one order row');
+has(/function\s+toggleVisibleSelection/, 'page must support selecting visible rows as a group');
+has(/function\s+deleteSelectedOrders/, 'page must support deleting selected orders');
+has(/حذف المحدد/, 'preview controls must include an Arabic delete selected action');
+has(/outputRows\s*=\s*outputRows\.filter\(\(row\)\s*=>\s*!\s*selectedOrderKeys\.has\(row\.__rowKey\)\)/, 'delete action must remove selected rows from the export data');
 has(/prepared_orders_\$\{new Date\(\)\.toISOString\(\)\.slice\(0,10\)\}\.csv/, 'export filename must include the current date');
 
 const api = fs.readFileSync('api/prepare-orders.js', 'utf8');
