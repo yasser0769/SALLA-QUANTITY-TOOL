@@ -1,0 +1,368 @@
+const TOKEN_ENDPOINT = 'https://apilisting.fragrancex.com/token';
+const PRODUCT_LIST_ENDPOINT = 'https://apilisting.fragrancex.com/product/list/';
+const FIXED_SHIPPING_ENDPOINT = 'https://apiordering.fragrancex.com/order/GetFixedShipping/';
+const VAT_COUNTRIES_ENDPOINT = 'https://apiordering.fragrancex.com/order/GetVatCountries/';
+const DEFAULT_COUNTRY_CODE = 'SA';
+const DEFAULT_USD_TO_SAR_RATE = 3.75;
+const CACHE_TTL_SECONDS = 60 * 60 * 30;
+
+let inMemoryToken = null;
+
+function sendJson(response, statusCode, payload) {
+  response.statusCode = statusCode;
+  response.setHeader('Content-Type', 'application/json; charset=utf-8');
+  response.end(JSON.stringify(payload));
+}
+
+function readRequestBody(request) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    request.on('data', chunk => {
+      body += chunk;
+      if (body.length > 1_000_000) {
+        reject(new Error('Request body is too large'));
+        request.destroy();
+      }
+    });
+    request.on('end', () => resolve(body));
+    request.on('error', reject);
+  });
+}
+
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function cleanSku(value) {
+  return String(value ?? '').replace(/[^\d]/g, '').trim();
+}
+
+function numberValue(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  const cleaned = String(value ?? '').replace(/[^\d.-]/g, '');
+  const amount = Number.parseFloat(cleaned);
+  return Number.isFinite(amount) ? amount : 0;
+}
+
+function roundMoney(value) {
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+function configuredUsdToSarRate() {
+  const value = Number.parseFloat(process.env.USD_TO_SAR_RATE || '');
+  return Number.isFinite(value) && value > 0 ? value : DEFAULT_USD_TO_SAR_RATE;
+}
+
+function redisConfig() {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) {
+    const error = new Error('تخزين Upstash Redis غير مهيأ في Vercel. أضف UPSTASH_REDIS_REST_URL و UPSTASH_REDIS_REST_TOKEN حتى يعمل كاش FragranceX اليومي.');
+    error.statusCode = 500;
+    throw error;
+  }
+  return { url, token };
+}
+
+async function redisCommand(command) {
+  const config = redisConfig();
+  const response = await fetch(config.url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(command)
+  });
+  if (!response.ok) {
+    const error = new Error(`تعذر الاتصال بكاش Upstash Redis (${response.status})`);
+    error.statusCode = 500;
+    throw error;
+  }
+  return response.json();
+}
+
+async function readCache(key) {
+  const data = await redisCommand(['GET', key]);
+  if (!data?.result) return null;
+  return typeof data.result === 'string' ? JSON.parse(data.result) : data.result;
+}
+
+async function writeCache(key, value) {
+  await redisCommand(['SET', key, JSON.stringify(value), 'EX', CACHE_TTL_SECONDS]);
+}
+
+function extractArray(payload, preferredKeys) {
+  if (Array.isArray(payload)) return payload;
+  for (const key of preferredKeys) {
+    if (Array.isArray(payload?.[key])) return payload[key];
+  }
+  const firstArray = Object.values(payload || {}).find(Array.isArray);
+  if (firstArray) return firstArray;
+  throw new Error('رد FragranceX لا يحتوي قائمة صالحة');
+}
+
+async function fragrancexToken() {
+  if (inMemoryToken && inMemoryToken.expiresAt > Date.now() + 60_000) {
+    return inMemoryToken.accessToken;
+  }
+  const apiId = process.env.FRAGRANCEX_API_ID;
+  const apiKey = process.env.FRAGRANCEX_API_KEY;
+  if (!apiId || !apiKey) {
+    const error = new Error('FRAGRANCEX_API_ID أو FRAGRANCEX_API_KEY غير مضافة في إعدادات Vercel');
+    error.statusCode = 500;
+    throw error;
+  }
+
+  const response = await fetch(TOKEN_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'apiAccessKey',
+      apiAccessId: apiId,
+      apiAccessKey: apiKey
+    })
+  });
+  if (!response.ok) {
+    const error = new Error(`تعذر الحصول على توكن FragranceX (${response.status})`);
+    error.statusCode = response.status;
+    throw error;
+  }
+  const data = await response.json();
+  if (!data.access_token) throw new Error('FragranceX لم يرجع access_token صالح');
+  inMemoryToken = {
+    accessToken: data.access_token,
+    expiresAt: Date.now() + Math.max(60, Number(data.expires_in) || 3600) * 1000
+  };
+  return inMemoryToken.accessToken;
+}
+
+async function fragrancexGet(url, token) {
+  const response = await fetch(url, {
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    }
+  });
+  if (!response.ok) {
+    const error = new Error(`خطأ من FragranceX (${response.status})`);
+    error.statusCode = response.status;
+    throw error;
+  }
+  return response.json();
+}
+
+function normalizeProductCatalog(products) {
+  const bySku = {};
+  for (const product of products) {
+    const sku = cleanSku(product.ItemId ?? product.ItemID ?? product.ItemNo ?? product.ItemNumber ?? product.itemId);
+    if (!sku || bySku[sku]) continue;
+    const wholesalePriceUSD = numberValue(product.WholesalePriceUSD ?? product.wholesalePriceUSD ?? product.WholesalePrice ?? product.Cost);
+    if (wholesalePriceUSD > 0) {
+      bySku[sku] = { wholesalePriceUSD: roundMoney(wholesalePriceUSD) };
+    }
+  }
+  return bySku;
+}
+
+function normalizeShippingCountries(rows) {
+  return rows.map(row => ({
+    countryCode: String(row.CountryCode ?? row.countryCode ?? '').trim().toUpperCase(),
+    countryName: String(row.CountryName ?? row.countryName ?? '').trim(),
+    shippingRateUSD: roundMoney(numberValue(row.ShippingRate ?? row.shippingRate))
+  })).filter(row => row.countryCode || row.countryName);
+}
+
+function normalizeVatCountries(rows) {
+  return rows.map(row => ({
+    countryCode: String(row.CountryCode ?? row.countryCode ?? '').trim().toUpperCase(),
+    countryName: String(row.CountryName ?? row.countryName ?? '').trim(),
+    minSubTotalUSD: numberValue(row.MinSubTotal ?? row.minSubTotal),
+    maxSubTotalUSD: numberValue(row.MaxSubTotal ?? row.maxSubTotal),
+    exceptionSubTotalUSD: numberValue(row.ExceptionSubTotal ?? row.exceptionSubTotal),
+    vatRate: numberValue(row.VatRate ?? row.VATRate ?? row.vatRate)
+  })).filter(row => row.countryCode || row.countryName);
+}
+
+async function cachedDataset(cacheName, loader) {
+  const key = `fragrancex:${cacheName}:${todayKey()}`;
+  const cached = await readCache(key);
+  if (cached) return { value: cached, cacheKey: key, cacheHit: true };
+  const value = await loader();
+  await writeCache(key, value);
+  return { value, cacheKey: key, cacheHit: false };
+}
+
+async function loadCostData() {
+  let tokenPromise = null;
+  const getToken = () => {
+    tokenPromise ||= fragrancexToken();
+    return tokenPromise;
+  };
+  const catalog = await cachedDataset('catalog', async () => {
+    const token = await getToken();
+    const data = await fragrancexGet(PRODUCT_LIST_ENDPOINT, token);
+    return normalizeProductCatalog(extractArray(data, ['ListProduct', 'Products', 'Product', 'products', 'items']));
+  });
+  const shipping = await cachedDataset('shipping', async () => {
+    const token = await getToken();
+    const data = await fragrancexGet(FIXED_SHIPPING_ENDPOINT, token);
+    return normalizeShippingCountries(extractArray(data, ['FixedShippingCountry', 'FixedShippingCountries', 'fixedShippingCountries']));
+  });
+  const vat = await cachedDataset('vat', async () => {
+    const token = await getToken();
+    const data = await fragrancexGet(VAT_COUNTRIES_ENDPOINT, token);
+    return normalizeVatCountries(extractArray(data, ['VatCountry', 'VatCountries', 'vatCountries']));
+  });
+  return { catalog, shipping, vat };
+}
+
+function findCountryRow(rows, countryCode) {
+  const code = String(countryCode || DEFAULT_COUNTRY_CODE).trim().toUpperCase();
+  return rows.find(row => row.countryCode === code) || rows.find(row => /saudi/i.test(row.countryName));
+}
+
+function vatAmountUSD(vatRule, subtotalUSD) {
+  if (!vatRule || subtotalUSD <= 0) return 0;
+  if (vatRule.exceptionSubTotalUSD > 0 && subtotalUSD < vatRule.exceptionSubTotalUSD) return 0;
+  if (vatRule.minSubTotalUSD > 0 && subtotalUSD < vatRule.minSubTotalUSD) return 0;
+  if (vatRule.maxSubTotalUSD > 0 && subtotalUSD > vatRule.maxSubTotalUSD) return 0;
+  const rate = vatRule.vatRate > 1 ? vatRule.vatRate / 100 : vatRule.vatRate;
+  return roundMoney(subtotalUSD * Math.max(0, rate));
+}
+
+function normalizeOrderItems(items) {
+  const map = new Map();
+  for (const item of Array.isArray(items) ? items : []) {
+    const sku = cleanSku(item.sku);
+    const quantity = Math.max(0, Number.parseInt(item.quantity, 10) || 0);
+    if (!sku || quantity <= 0) continue;
+    map.set(sku, (map.get(sku) || 0) + quantity);
+  }
+  return [...map.entries()].map(([sku, quantity]) => ({ sku, quantity }));
+}
+
+function calculateOrderCosts({ orders, catalog, shippingRows, vatRows, countryCode = DEFAULT_COUNTRY_CODE, usdToSarRate = DEFAULT_USD_TO_SAR_RATE }) {
+  const shippingRule = findCountryRow(shippingRows, countryCode);
+  const vatRule = findCountryRow(vatRows, countryCode);
+  const shippingRateUSD = shippingRule?.shippingRateUSD || 0;
+
+  const results = orders.map(order => {
+    const items = normalizeOrderItems(order.items);
+    const missingSkus = [];
+    let productCostUSD = 0;
+    for (const item of items) {
+      const product = catalog[item.sku];
+      if (!product) {
+        missingSkus.push({ sku: item.sku, quantity: item.quantity });
+        continue;
+      }
+      productCostUSD += item.quantity * product.wholesalePriceUSD;
+    }
+    productCostUSD = roundMoney(productCostUSD);
+    const shippingCostUSD = productCostUSD > 0 ? shippingRateUSD : 0;
+    const vatCostUSD = vatAmountUSD(vatRule, productCostUSD + shippingCostUSD);
+    const landedCostUSD = roundMoney(productCostUSD + shippingCostUSD + vatCostUSD);
+    const landedCostSAR = roundMoney(landedCostUSD * usdToSarRate);
+    const orderValueSAR = roundMoney(numberValue(order.totalValueSAR ?? order.totalValue));
+    return {
+      orderId: String(order.orderId || ''),
+      items,
+      missingSkus,
+      productCostUSD,
+      shippingCostUSD,
+      vatCostUSD,
+      landedCostUSD,
+      productCostSAR: roundMoney(productCostUSD * usdToSarRate),
+      shippingCostSAR: roundMoney(shippingCostUSD * usdToSarRate),
+      vatCostSAR: roundMoney(vatCostUSD * usdToSarRate),
+      landedCostSAR,
+      profitSAR: roundMoney(orderValueSAR - landedCostSAR),
+      status: missingSkus.length ? 'missing_skus' : productCostUSD > 0 ? 'ok' : 'no_matched_items'
+    };
+  });
+
+  return {
+    currency: 'SAR',
+    sourceCurrency: 'USD',
+    usdToSarRate,
+    shippingRateUSD,
+    vatRate: vatRule?.vatRate || 0,
+    results,
+    totals: results.reduce((totals, row) => {
+      totals.productCostSAR = roundMoney(totals.productCostSAR + row.productCostSAR);
+      totals.shippingCostSAR = roundMoney(totals.shippingCostSAR + row.shippingCostSAR);
+      totals.vatCostSAR = roundMoney(totals.vatCostSAR + row.vatCostSAR);
+      totals.landedCostSAR = roundMoney(totals.landedCostSAR + row.landedCostSAR);
+      totals.profitSAR = roundMoney(totals.profitSAR + row.profitSAR);
+      totals.missingSkuCount += row.missingSkus.length;
+      return totals;
+    }, { productCostSAR: 0, shippingCostSAR: 0, vatCostSAR: 0, landedCostSAR: 0, profitSAR: 0, missingSkuCount: 0 })
+  };
+}
+
+async function handler(request, response) {
+  if (request.method === 'GET') {
+    return sendJson(response, 200, {
+      ok: true,
+      fragrancexConfigured: Boolean(process.env.FRAGRANCEX_API_ID && process.env.FRAGRANCEX_API_KEY),
+      redisConfigured: Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN),
+      accessTokenConfigured: Boolean(process.env.TRANSLATION_ACCESS_TOKEN),
+      usdToSarRate: configuredUsdToSarRate()
+    });
+  }
+
+  if (request.method !== 'POST') {
+    response.setHeader('Allow', 'GET, POST');
+    return sendJson(response, 405, { error: 'Method not allowed' });
+  }
+
+  const accessToken = process.env.TRANSLATION_ACCESS_TOKEN;
+  const providedToken = request.headers['x-translation-access-token'];
+  if (accessToken && providedToken !== accessToken) {
+    return sendJson(response, 401, { error: 'Invalid translation access token' });
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(await readRequestBody(request));
+  } catch (error) {
+    return sendJson(response, 400, { error: 'Invalid JSON request body' });
+  }
+
+  const orders = Array.isArray(payload.orders) ? payload.orders : [];
+  if (!orders.length) return sendJson(response, 400, { error: 'Orders are required' });
+  if (orders.length > 500) return sendJson(response, 400, { error: 'Cannot price more than 500 orders at once' });
+
+  try {
+    const costData = await loadCostData();
+    const calculated = calculateOrderCosts({
+      orders,
+      catalog: costData.catalog.value,
+      shippingRows: costData.shipping.value,
+      vatRows: costData.vat.value,
+      countryCode: payload.countryCode || DEFAULT_COUNTRY_CODE,
+      usdToSarRate: configuredUsdToSarRate()
+    });
+    return sendJson(response, 200, {
+      ok: true,
+      ...calculated,
+      cache: {
+        catalog: costData.catalog.cacheHit,
+        shipping: costData.shipping.cacheHit,
+        vat: costData.vat.cacheHit
+      }
+    });
+  } catch (error) {
+    return sendJson(response, error.statusCode || 500, {
+      error: error.message || 'FragranceX cost request failed'
+    });
+  }
+}
+
+module.exports = handler;
+module.exports.calculateOrderCosts = calculateOrderCosts;
+module.exports.normalizeProductCatalog = normalizeProductCatalog;
+module.exports.normalizeShippingCountries = normalizeShippingCountries;
+module.exports.normalizeVatCountries = normalizeVatCountries;
+module.exports.vatAmountUSD = vatAmountUSD;

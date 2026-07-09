@@ -73,7 +73,7 @@ h1{font-size:clamp(1.55rem,3vw,2.1rem);font-weight:700;margin-bottom:8px}
 .search{width:100%;padding:10px 12px;background:#ffffff;border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;outline:none;min-height:42px}
 @media(max-width:760px){.preview-tools{grid-template-columns:1fr}.actions .btn{width:100%}}
 .table-wrap{background:#fff;border:1px solid var(--border);border-radius:var(--radius);overflow:auto;max-height:62vh;box-shadow:var(--shadow)}
-table{width:100%;border-collapse:collapse;font-size:.76rem;min-width:1220px;direction:ltr}
+table{width:100%;border-collapse:collapse;font-size:.76rem;min-width:1640px;direction:ltr}
 thead{position:sticky;top:0;z-index:2}
 th{background:#f1f5f9;padding:11px 8px;font-weight:800;text-align:left;color:var(--text2);font-size:.7rem;border-bottom:1px solid var(--border);white-space:nowrap}
 td{padding:7px 8px;border-bottom:1px solid rgba(219,227,237,.78);white-space:nowrap;vertical-align:top}
@@ -83,6 +83,10 @@ td input:focus{border-color:rgba(15,118,110,.45);background:#fff;box-shadow:0 0 
 .row-select-cell{width:46px;min-width:46px;text-align:center}
 .row-select-cell input{width:18px;min-width:18px;height:18px;accent-color:var(--accent);cursor:pointer}
 .summary-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--text2);font-size:.82rem;font-weight:800}
+.cost-cell{font-weight:800;text-align:left}
+.cost-status{min-width:150px;white-space:normal;line-height:1.45}
+.profit-good{color:var(--green)}
+.profit-bad{color:var(--red)}
 .pill{display:inline-block;padding:2px 8px;border-radius:5px;font-size:.68rem;font-weight:800}
 .ok{background:var(--green-dim);color:var(--green)}
 .warn{background:var(--amber-dim);color:var(--amber)}
@@ -183,6 +187,7 @@ td input:focus{border-color:rgba(15,118,110,.45);background:#fff;box-shadow:0 0 
 const STORAGE_KEY = 'salla_prepare_orders_settings';
 const API_TIMEOUT_MS = 90000;
 const CSV_HEADERS = ['COrderID','FirstName','LastName','Address','Address2','City','State','Zip','Country','ShipMethod','Phone','OrderDetails','GiftWrap','Message'];
+const COST_PREVIEW_HEADERS = ['تكلفة المورد','الشحن','VAT','تكلفة الوصول','الربح المتوقع','حالة المورد'];
 const MODEL_OPTIONS = {
   openrouter: [
     ['anthropic/claude-sonnet-4', 'Claude Sonnet 4'],
@@ -318,7 +323,8 @@ async function parseExcelFile(file){
       totalValue: totalIndex >= 0 ? parseMoneyValue(row[totalIndex]) : 0,
       sku: String(row[18] || '').trim(),
       address: String(row[19] || '').trim(),
-      products: String(row[20] || '').trim()
+      products: String(row[20] || '').trim(),
+      items: parseOrderItems(row[20])
     });
   }
   return orders;
@@ -424,6 +430,47 @@ async function translateBatch(orders, accessToken, provider, model){
     clearTimeout(timer);
   }
 }
+async function fetchSupplierCosts(rows, accessToken){
+  const costOrders = rows.map((row) => ({
+    orderId: row.COrderID,
+    totalValueSAR: row.__orderTotal || 0,
+    items: row.__supplierItems || []
+  })).filter((order) => order.items.length > 0);
+  if (costOrders.length === 0) return null;
+  const response = await fetch('/api/fragrancex-costs', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Translation-Access-Token': accessToken
+    },
+    body: JSON.stringify({
+      countryCode: 'SA',
+      orders: costOrders
+    })
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(parseSupplierCostApiError(response.status, text));
+  }
+  const data = await response.json();
+  if (!Array.isArray(data.results)) throw new Error('لم يرجع API تكلفة المورد بشكل صالح');
+  applySupplierCosts(data.results);
+  return data;
+}
+function applySupplierCosts(results){
+  const byOrderId = new Map(results.map((item) => [String(item.orderId), item]));
+  for (const row of outputRows) {
+    const cost = byOrderId.get(String(row.COrderID));
+    if (!cost) continue;
+    row.__supplierProductCost = Number(cost.productCostSAR) || 0;
+    row.__supplierShippingCost = Number(cost.shippingCostSAR) || 0;
+    row.__supplierVatCost = Number(cost.vatCostSAR) || 0;
+    row.__supplierLandedCost = Number(cost.landedCostSAR) || 0;
+    row.__supplierProfit = Number(cost.profitSAR) || 0;
+    row.__supplierMissingSkus = Array.isArray(cost.missingSkus) ? cost.missingSkus : [];
+    row.__supplierStatus = cost.status || '';
+  }
+}
 function parsePrepareOrdersApiError(status, text){
   let message = '';
   try {
@@ -441,6 +488,24 @@ function parsePrepareOrdersApiError(status, text){
     return 'مفتاح DeepSeek غير مضاف في إعدادات Vercel.';
   }
   return `خطأ من API (${status}): ${message.slice(0, 600)}`;
+}
+function parseSupplierCostApiError(status, text){
+  let message = '';
+  try {
+    message = JSON.parse(text)?.error || '';
+  } catch {
+    message = String(text || '');
+  }
+  if (status === 401 || /Invalid translation access token/i.test(message)) {
+    return 'رمز الدخول غير صحيح لحساب تكلفة المورد.';
+  }
+  if (/FRAGRANCEX_API_ID|FRAGRANCEX_API_KEY/i.test(message)) {
+    return 'مفاتيح FragranceX غير مضافة في إعدادات Vercel.';
+  }
+  if (/UPSTASH_REDIS_REST/i.test(message) || /Upstash Redis/i.test(message)) {
+    return 'كاش Upstash Redis غير مهيأ في Vercel، وهو مطلوب لتجنب استهلاك حد FragranceX اليومي.';
+  }
+  return `خطأ من API تكلفة المورد (${status}): ${message.slice(0, 600)}`;
 }
 async function processOrders(){
   if (!orderFile) return;
@@ -473,6 +538,16 @@ async function processOrders(){
       setProgress(10 + Math.round((Math.min(start + batchSize, rawOrders.length) / rawOrders.length) * 80));
     }
     outputRows = withRowKeys(mapOrderData(rawOrders, aiResults));
+    try {
+      log('حساب تكلفة المورد من FragranceX...');
+      const costData = await fetchSupplierCosts(outputRows, accessToken);
+      if (costData) {
+        const missing = costData.totals?.missingSkuCount || 0;
+        log(`تم حساب تكلفة المورد. SKUs ناقصة: ${missing}.`);
+      }
+    } catch (costError) {
+      log(`تنبيه تكلفة المورد: ${costError.message}`);
+    }
     selectedOrderKeys.clear();
     $('stConverted').textContent = outputRows.length;
     $('stMissingState').textContent = outputRows.filter((row) => !row.State).length;
@@ -507,6 +582,18 @@ function parseOrderDetails(products){
   const matches = [...String(products).matchAll(/\(SKU:\s*([^)]+?)\).*?\(Qty:\s*(\d+)\)/g)];
   if (matches.length === 0) return '';
   return matches.map((match) => `${match[2]},${String(match[1]).trim()}`).join('|') + '|';
+}
+function parseOrderItems(products){
+  if (!products) return [];
+  const matches = [...String(products).matchAll(/\(SKU:\s*([^)]+?)\).*?\(Qty:\s*(\d+)\)/g)];
+  const bySku = new Map();
+  for (const match of matches) {
+    const sku = String(match[1] || '').replace(/[^\d]/g, '').trim();
+    const quantity = Math.max(0, Number.parseInt(match[2], 10) || 0);
+    if (!sku || quantity <= 0) continue;
+    bySku.set(sku, (bySku.get(sku) || 0) + quantity);
+  }
+  return [...bySku.entries()].map(([sku, quantity]) => ({ sku, quantity }));
 }
 const CANONICAL_REGIONS = ['Riyadh','Mecca','Madinah','Eastern Province','Al Qassim','Asir','Tabuk','Hail','Northern Borders','Jazan','Najran','Al Bahah','Al Jouf'];
 const REGION_ALIASES = {
@@ -563,7 +650,15 @@ function mapOrderData(raw, aiResults){
       OrderDetails: parseOrderDetails(order.products),
       GiftWrap: 'n',
       Message: '',
-      __orderTotal: order.totalValue || 0
+      __orderTotal: order.totalValue || 0,
+      __supplierItems: order.items || [],
+      __supplierProductCost: 0,
+      __supplierShippingCost: 0,
+      __supplierVatCost: 0,
+      __supplierLandedCost: 0,
+      __supplierProfit: 0,
+      __supplierMissingSkus: [],
+      __supplierStatus: ''
     };
   });
 }
@@ -586,24 +681,57 @@ function updateOrderCounters(){
 function orderTotalValue(){
   return outputRows.reduce((sum, row) => sum + (Number(row.__orderTotal) || 0), 0);
 }
+function supplierTotals(){
+  return outputRows.reduce((totals, row) => {
+    totals.product += Number(row.__supplierProductCost) || 0;
+    totals.shipping += Number(row.__supplierShippingCost) || 0;
+    totals.vat += Number(row.__supplierVatCost) || 0;
+    totals.landed += Number(row.__supplierLandedCost) || 0;
+    totals.profit += Number(row.__supplierProfit) || 0;
+    totals.missing += Array.isArray(row.__supplierMissingSkus) ? row.__supplierMissingSkus.length : 0;
+    return totals;
+  }, { product: 0, shipping: 0, vat: 0, landed: 0, profit: 0, missing: 0 });
+}
 function formatCurrency(value){
   return `${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ر.س`;
 }
+function costStatusLabel(row){
+  const missingSkus = Array.isArray(row.__supplierMissingSkus) ? row.__supplierMissingSkus : [];
+  if (missingSkus.length) {
+    return `SKU ناقص: ${missingSkus.map((item) => `${item.sku}×${item.quantity}`).join(', ')}`;
+  }
+  if (row.__supplierStatus === 'ok') return 'مطابق';
+  if (row.__supplierItems?.length) return 'لم تحسب';
+  return 'بدون SKU';
+}
+function costPreviewCells(row){
+  const profit = Number(row.__supplierProfit) || 0;
+  const profitClass = profit >= 0 ? 'profit-good' : 'profit-bad';
+  return [
+    `<td class="cost-cell">${formatCurrency(row.__supplierProductCost)}</td>`,
+    `<td class="cost-cell">${formatCurrency(row.__supplierShippingCost)}</td>`,
+    `<td class="cost-cell">${formatCurrency(row.__supplierVatCost)}</td>`,
+    `<td class="cost-cell">${formatCurrency(row.__supplierLandedCost)}</td>`,
+    `<td class="cost-cell ${profitClass}">${formatCurrency(profit)}</td>`,
+    `<td class="cost-status">${escapeHtml(costStatusLabel(row))}</td>`
+  ].join('');
+}
 function renderPreview(){
   const rows = filteredRows();
+  const totals = supplierTotals();
   $('previewPanel').classList.add('on');
   $('previewCount').textContent = `${rows.length} ظاهر`;
-  $('orderTotalSummary').innerHTML = `إجمالي قيمة الطلبات: <span class="pill ok">${formatCurrency(orderTotalValue())}</span> الطلبات: <span class="pill ok">${outputRows.length}</span> المحدد: <span class="pill warn">${selectedOrderKeys.size}</span>`;
+  $('orderTotalSummary').innerHTML = `إجمالي قيمة الطلبات: <span class="pill ok">${formatCurrency(orderTotalValue())}</span> تكلفة المورد: <span class="pill warn">${formatCurrency(totals.product)}</span> الشحن: <span class="pill warn">${formatCurrency(totals.shipping)}</span> VAT: <span class="pill warn">${formatCurrency(totals.vat)}</span> تكلفة الوصول: <span class="pill warn">${formatCurrency(totals.landed)}</span> الربح المتوقع: <span class="pill ${totals.profit >= 0 ? 'ok' : 'bad'}">${formatCurrency(totals.profit)}</span> الطلبات: <span class="pill ok">${outputRows.length}</span> المحدد: <span class="pill warn">${selectedOrderKeys.size}</span>${totals.missing ? ` <span class="pill bad">SKU ناقص ${totals.missing}</span>` : ''}`;
   if (outputRows.length === 0) {
     $('tableWrap').innerHTML = '<div class="empty">لا توجد نتائج بعد.</div>';
     updateSelectionUi(rows);
     return;
   }
-  const head = `<th class="row-select-cell"><input id="selectVisibleRows" type="checkbox" title="تحديد كل الطلبات الظاهرة" onchange="toggleVisibleSelection(this.checked)"></th>` + CSV_HEADERS.map((header) => `<th>${header}</th>`).join('');
+  const head = `<th class="row-select-cell"><input id="selectVisibleRows" type="checkbox" title="تحديد كل الطلبات الظاهرة" onchange="toggleVisibleSelection(this.checked)"></th>` + CSV_HEADERS.map((header) => `<th>${header}</th>`).join('') + COST_PREVIEW_HEADERS.map((header) => `<th>${header}</th>`).join('');
   const body = rows.map((row) => {
     const sourceIndex = outputRows.indexOf(row);
     const checked = selectedOrderKeys.has(row.__rowKey) ? 'checked' : '';
-    return `<tr><td class="row-select-cell"><input type="checkbox" ${checked} onchange="toggleOrderSelection(${jsArg(row.__rowKey)}, this.checked)"></td>${CSV_HEADERS.map((header) => `<td><input value="${escapeHtml(row[header])}" oninput="editCell(${sourceIndex}, '${header}', this.value)"></td>`).join('')}</tr>`;
+    return `<tr><td class="row-select-cell"><input type="checkbox" ${checked} onchange="toggleOrderSelection(${jsArg(row.__rowKey)}, this.checked)"></td>${CSV_HEADERS.map((header) => `<td><input value="${escapeHtml(row[header])}" oninput="editCell(${sourceIndex}, '${header}', this.value)"></td>`).join('')}${costPreviewCells(row)}</tr>`;
   }).join('');
   $('tableWrap').innerHTML = `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
   updateSelectionUi(rows);
