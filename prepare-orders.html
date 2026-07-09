@@ -107,7 +107,7 @@ td input:focus{border-color:rgba(15,118,110,.45);background:#fff;box-shadow:0 0 
   </header>
 
   <div class="note">
-    <strong>طريقة العمل:</strong> الصفحة تقرأ الأعمدة نفسها في أداة Order Converter الأصلية: رقم الطلب، اسم العميل، الجوال، المدينة، SKU، عنوان العميل، وأسماء المنتجات مع الكميات.
+    <strong>طريقة العمل:</strong> الصفحة تقرأ الأعمدة نفسها في أداة Order Converter الأصلية: رقم الطلب، اسم العميل، الجوال، المدينة، قيمة الطلب النهائية، SKU، عنوان العميل، وأسماء المنتجات مع الكميات.
     يتم إرسال الاسم والمدينة والعنوان فقط إلى مزود الذكاء الاصطناعي لاستخراج الاسم الإنجليزي، المدينة، المنطقة، الرمز البريدي، والعنوان المختصر.
   </div>
 
@@ -165,7 +165,7 @@ td input:focus{border-color:rgba(15,118,110,.45);background:#fff;box-shadow:0 0 
     <div class="panel-head">
       <div>
         <h2>مراجعة ملف الشحن</h2>
-        <div class="summary-line" id="orderTotalSummary">الإجمالي: 0 طلب</div>
+        <div class="summary-line" id="orderTotalSummary">إجمالي قيمة الطلبات: 0.00 ر.س</div>
       </div>
       <span class="pill ok" id="previewCount">0 ظاهر</span>
     </div>
@@ -303,6 +303,8 @@ async function parseExcelFile(file){
   const sheet = workbook.Sheets[sheetName];
   const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
   if (rows.length < 2) throw new Error('ملف الطلبات فارغ أو لا يحتوي على بيانات');
+  const headers = rows[0] || [];
+  const totalIndex = findOrderTotalColumn(headers);
   const orders = [];
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
@@ -313,12 +315,76 @@ async function parseExcelFile(file){
       name: String(row[2] || '').trim(),
       phone: String(row[3] || '').trim(),
       city: String(row[4] || '').trim(),
+      totalValue: totalIndex >= 0 ? parseMoneyValue(row[totalIndex]) : 0,
       sku: String(row[18] || '').trim(),
       address: String(row[19] || '').trim(),
       products: String(row[20] || '').trim()
     });
   }
   return orders;
+}
+function normalizeArabicDigits(value){
+  const arabic = '٠١٢٣٤٥٦٧٨٩';
+  const persian = '۰۱۲۳۴۵۶۷۸۹';
+  return String(value ?? '').replace(/[٠-٩۰-۹]/g, (digit) => {
+    const arabicIndex = arabic.indexOf(digit);
+    return String(arabicIndex >= 0 ? arabicIndex : persian.indexOf(digit));
+  });
+}
+function normalizeHeader(value){
+  return normalizeArabicDigits(value)
+    .toLowerCase()
+    .replace(/[إأآ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+function findOrderTotalColumn(headers){
+  const blocked = /(shipping|shipment|delivery|discount|coupon|tax|vat|wallet|refund|fee|الشحن|التوصيل|الخصم|كوبون|الضريبه|الضريبة|المحفظه|المحفظة|استرجاع|رسوم)/;
+  const strong = [
+    /^(order )?(grand )?(final |net )?(total|amount)( amount| price)?$/,
+    /^(order amount|amount paid|paid amount|total paid)$/,
+    /^(اجمالي|الاجمالي|المجموع|المبلغ|القيمه)( قيمه)?( الطلب| الطلبات| النهائي| الاجمالي)?$/,
+    /^(قيمه|قيمة) (الطلب|الطلبات)( النهائيه| النهائية)?$/,
+    /^(مبلغ|المبلغ) (الطلب|الطلبات|الاجمالي|النهائي)$/
+  ];
+  const loose = [
+    /(order|grand|final|net).*(total|amount|price)/,
+    /(total|amount|price).*(order|grand|final|net)/,
+    /(اجمالي|الاجمالي|المجموع|المبلغ).*(الطلب|الطلبات|النهائي|القيمه|القيمة)/,
+    /(الطلب|الطلبات|النهائي).*(اجمالي|الاجمالي|المجموع|المبلغ|القيمه|القيمة)/
+  ];
+  const normalized = headers.map(normalizeHeader);
+  let fallbackIndex = -1;
+  for (let index = 0; index < normalized.length; index++) {
+    const header = normalized[index];
+    if (!header || blocked.test(header)) continue;
+    if (strong.some((pattern) => pattern.test(header))) return index;
+    if (fallbackIndex === -1 && loose.some((pattern) => pattern.test(header))) fallbackIndex = index;
+  }
+  return fallbackIndex;
+}
+function parseMoneyValue(value){
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  let text = normalizeArabicDigits(value)
+    .replace(/٫/g, '.')
+    .replace(/٬/g, ',')
+    .replace(/[^\d.,-]/g, '')
+    .trim();
+  if (!text) return 0;
+  const hasComma = text.includes(',');
+  const hasDot = text.includes('.');
+  if (hasComma && hasDot) {
+    text = text.replace(/,/g, '');
+  } else if (hasComma) {
+    const lastComma = text.lastIndexOf(',');
+    const decimalDigits = text.length - lastComma - 1;
+    text = decimalDigits > 0 && decimalDigits <= 2
+      ? text.replace(/,/g, '.')
+      : text.replace(/,/g, '');
+  }
+  const amount = Number.parseFloat(text);
+  return Number.isFinite(amount) ? amount : 0;
 }
 async function translateBatch(orders, accessToken, provider, model){
   const controller = new AbortController();
@@ -496,7 +562,8 @@ function mapOrderData(raw, aiResults){
       Phone: formatPhone(order.phone),
       OrderDetails: parseOrderDetails(order.products),
       GiftWrap: 'n',
-      Message: ''
+      Message: '',
+      __orderTotal: order.totalValue || 0
     };
   });
 }
@@ -516,11 +583,17 @@ function updateOrderCounters(){
   $('stMissingState').textContent = outputRows.filter((row) => !row.State).length;
   $('stMissingDetails').textContent = outputRows.filter((row) => !row.OrderDetails).length;
 }
+function orderTotalValue(){
+  return outputRows.reduce((sum, row) => sum + (Number(row.__orderTotal) || 0), 0);
+}
+function formatCurrency(value){
+  return `${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ر.س`;
+}
 function renderPreview(){
   const rows = filteredRows();
   $('previewPanel').classList.add('on');
   $('previewCount').textContent = `${rows.length} ظاهر`;
-  $('orderTotalSummary').innerHTML = `الإجمالي: <span class="pill ok">${outputRows.length} طلب</span> المحدد: <span class="pill warn">${selectedOrderKeys.size}</span>`;
+  $('orderTotalSummary').innerHTML = `إجمالي قيمة الطلبات: <span class="pill ok">${formatCurrency(orderTotalValue())}</span> الطلبات: <span class="pill ok">${outputRows.length}</span> المحدد: <span class="pill warn">${selectedOrderKeys.size}</span>`;
   if (outputRows.length === 0) {
     $('tableWrap').innerHTML = '<div class="empty">لا توجد نتائج بعد.</div>';
     updateSelectionUi(rows);

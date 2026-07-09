@@ -38,8 +38,13 @@ has(/function\s+parseOrderDetails/, 'page must convert product quantities to Qty
 has(/COrderID.*FirstName.*LastName.*Address.*OrderDetails/s, 'CSV headers must match the original order converter output');
 has(/function\s+downloadCSV/, 'page must export CSV');
 has(/function\s+renderPreview/, 'page must render an editable preview table');
-has(/id="orderTotalSummary"/, 'preview must show total order count above the table');
-has(/الإجمالي:/, 'preview total must use a visible Arabic label');
+has(/id="orderTotalSummary"/, 'preview must show total order value above the table');
+has(/إجمالي قيمة الطلبات:/, 'preview total must use a visible Arabic value label');
+has(/function\s+findOrderTotalColumn/, 'page must detect the final order value column from workbook headers');
+has(/function\s+parseMoneyValue/, 'page must parse localized order value cells');
+has(/__orderTotal/, 'page must keep the order value internally without adding it to shipping CSV headers');
+has(/function\s+orderTotalValue/, 'page must sum the final order values for the preview summary');
+has(/formatCurrency\(orderTotalValue\(\)\)/, 'preview summary must render the summed order value as currency');
 has(/selectedOrderKeys\s*=\s*new Set\(\)/, 'page must track selected orders separately from CSV data');
 has(/id="selectVisibleRows"/, 'preview table must support selecting all visible rows');
 has(/function\s+toggleOrderSelection/, 'page must support selecting one order row');
