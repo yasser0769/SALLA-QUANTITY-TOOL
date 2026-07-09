@@ -324,7 +324,6 @@ function calculateOrderCosts({ orders, catalog, shippingRows, vatRows, countryCo
   const results = orders.map(order => {
     const items = normalizeOrderItems(order.items);
     const missingSkus = [];
-    const matchedItems = [];
     let productCostUSD = 0;
     for (const item of items) {
       const product = catalog[item.sku];
@@ -332,12 +331,12 @@ function calculateOrderCosts({ orders, catalog, shippingRows, vatRows, countryCo
         missingSkus.push({ sku: item.sku, quantity: item.quantity });
         continue;
       }
-      matchedItems.push(item);
       productCostUSD += item.quantity * product.wholesalePriceUSD;
     }
     productCostUSD = roundMoney(productCostUSD);
-    const shippingEstimate = estimateSaudiShippingUSD(matchedItems, weightsBySku);
-    const shippingCostUSD = productCostUSD > 0
+    const shippingEstimate = estimateSaudiShippingUSD(items, weightsBySku);
+    const hasShippableItems = items.length > 0;
+    const shippingCostUSD = hasShippableItems
       ? roundMoney(useEstimatedShipping ? shippingEstimate.shippingCostUSD : shippingRateUSD)
       : 0;
     const vatCostUSD = vatAmountUSD(vatRule, productCostUSD + shippingCostUSD);
@@ -351,7 +350,7 @@ function calculateOrderCosts({ orders, catalog, shippingRows, vatRows, countryCo
       missingWeightSkus: shippingEstimate.missingWeightSkus,
       productCostUSD,
       shippingCostUSD,
-      shippingEstimated: productCostUSD > 0 && useEstimatedShipping,
+      shippingEstimated: hasShippableItems && useEstimatedShipping,
       shippingSource: useEstimatedShipping ? shippingEstimate.shippingSource : 'fixed_country',
       shippingWeightGrams: useEstimatedShipping ? shippingEstimate.totalGrams : 0,
       vatCostUSD,

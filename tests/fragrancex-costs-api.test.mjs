@@ -127,13 +127,14 @@ const fallbackShipping = costApi.calculateOrderCosts({
   orders: [
     { orderId: 'S400', totalValueSAR: 200, items: [{ sku: '555555', quantity: 1 }] },
     { orderId: 'S900', totalValueSAR: 200, items: [{ sku: '555555', quantity: 1 }, { sku: '666666', quantity: 1 }] },
-    { orderId: 'S1200', totalValueSAR: 200, items: [{ sku: '777777', quantity: 3 }] }
+    { orderId: 'S1200', totalValueSAR: 200, items: [{ sku: '777777', quantity: 3 }] },
+    { orderId: 'SMISSING', totalValueSAR: 200, items: [{ sku: '888888', quantity: 1 }] }
   ],
   catalog: { 555555: { wholesalePriceUSD: 10 }, 666666: { wholesalePriceUSD: 5 }, 777777: { wholesalePriceUSD: 3 } },
   shippingRows: [{ countryCode: 'US', shippingRateUSD: 6.95 }],
   vatRows: [{ countryCode: 'SA', minSubTotalUSD: 0, maxSubTotalUSD: 0, exceptionSubTotalUSD: 0, vatRate: 0 }],
   usdToSarRate: 3.75,
-  weightsBySku: { 555555: 400, 666666: 500, 777777: 400 }
+  weightsBySku: { 555555: 400, 666666: 500, 777777: 400, 888888: 500 }
 });
 
 assert.equal(fallbackShipping.shippingSource, 'weight_tiers');
@@ -145,6 +146,9 @@ assert.equal(fallbackShipping.results[1].shippingCostUSD, 18.95);
 assert.equal(fallbackShipping.results[1].shippingWeightGrams, 900);
 assert.equal(fallbackShipping.results[2].shippingCostUSD, 28.95);
 assert.equal(fallbackShipping.results[2].shippingWeightGrams, 1200);
+assert.equal(fallbackShipping.results[3].status, 'missing_skus');
+assert.equal(fallbackShipping.results[3].shippingCostUSD, 18.95);
+assert.equal(fallbackShipping.results[3].landedCostSAR, 71.06);
 
 try {
   process.env.FRAGRANCEX_API_ID = 'test-id';
