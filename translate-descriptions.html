@@ -67,11 +67,11 @@ h1{font-size:clamp(1.55rem,3vw,2.1rem);font-weight:700;margin-bottom:8px}
 .brand-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
 .brand-sort{flex:1 1 165px;padding:6px 9px;min-height:34px;font-size:.72rem;font-weight:700}
 .brand-grid{display:grid;grid-template-columns:1fr;gap:8px;max-height:470px;overflow:auto;padding-inline-end:4px}
-.brand-item{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#ffffff;border:1px solid var(--border);border-radius:8px;padding:9px 10px;font-size:.8rem}
-.brand-item label{display:flex;align-items:center;gap:8px;cursor:pointer;min-width:0}
-.brand-item input{accent-color:var(--accent)}
-.brand-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.brand-counts{display:flex;align-items:center;gap:5px;flex-wrap:wrap;justify-content:flex-end}
+.brand-item{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;background:#ffffff;border:1px solid var(--border);border-radius:8px;padding:9px 10px;font-size:.8rem}
+.brand-item label{display:flex;align-items:flex-start;gap:8px;cursor:pointer;min-width:0;width:100%}
+.brand-item input{accent-color:var(--accent);flex:0 0 auto;margin-top:3px}
+.brand-name{display:block;min-width:0;overflow:visible;text-overflow:clip;white-space:normal;overflow-wrap:anywhere;word-break:break-word;line-height:1.45;unicode-bidi:plaintext;text-align:start}
+.brand-counts{display:flex;align-items:center;gap:5px;flex-wrap:wrap;justify-content:flex-start}
 .brand-count{display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:5px;font-size:.67rem;font-weight:800;white-space:nowrap}
 .brand-count.green{background:var(--green-dim);color:var(--green)}
 .brand-count.red{background:var(--red-dim);color:var(--red)}
@@ -584,7 +584,7 @@ function renderBrandChecks(){
   const body=document.getElementById('brandChecks');
   body.innerHTML=visibleBrandEntries().map(({brand,total,ready,failed,invalid,missing,completed})=>`
     <div class="brand-item">
-      <label><input type="checkbox" ${selectedBrands.has(brand)?'checked':''} onchange="toggleBrand('${escapeAttr(encodeURIComponent(brand))}',this.checked)"><span class="brand-name">${escapeHtml(brand)}</span></label>
+      <label><input type="checkbox" ${selectedBrands.has(brand)?'checked':''} onchange="toggleBrand('${escapeAttr(encodeURIComponent(brand))}',this.checked)"><span class="brand-name" title="${escapeAttr(brand)}">${escapeHtml(brand)}</span></label>
       <span class="brand-counts" aria-label="إحصائيات الماركة">
         <span class="brand-count green" title="اكتمال ترجمة البراند">${completed?'مكتمل':'غير مكتمل'}</span>
         <span class="brand-count red" title="جاهز أو فاشل">${(ready+failed).toLocaleString()} متبقي</span>
