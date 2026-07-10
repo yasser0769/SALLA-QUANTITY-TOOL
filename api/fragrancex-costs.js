@@ -340,7 +340,7 @@ function calculateOrderCosts({ orders, catalog, shippingRows, vatRows, countryCo
     const shippingCostUSD = hasShippableItems
       ? roundMoney(useEstimatedShipping ? shippingEstimate.shippingCostUSD : shippingRateUSD)
       : 0;
-    const vatCostUSD = vatAmountUSD(vatRule, productCostUSD + shippingCostUSD);
+    const vatCostUSD = vatAmountUSD(vatRule, productCostUSD);
     const landedCostUSD = roundMoney(productCostUSD + shippingCostUSD + vatCostUSD);
     const landedCostSAR = roundMoney(landedCostUSD * usdToSarRate);
     const orderValueSAR = roundMoney(numberValue(order.totalValueSAR ?? order.totalValue));

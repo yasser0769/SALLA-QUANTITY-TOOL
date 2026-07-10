@@ -97,13 +97,13 @@ try {
   assert.equal(body.usdToSarRate, 3.75);
   assert.equal(body.results[0].productCostUSD, 20);
   assert.equal(body.results[0].shippingCostUSD, 20);
-  assert.equal(body.results[0].vatCostUSD, 6);
-  assert.equal(body.results[0].landedCostSAR, 172.5);
-  assert.equal(body.results[0].profitSAR, 27.5);
+  assert.equal(body.results[0].vatCostUSD, 3);
+  assert.equal(body.results[0].landedCostSAR, 161.25);
+  assert.equal(body.results[0].profitSAR, 38.75);
   assert.deepEqual(body.results[0].missingSkus, [{ sku: '999999', quantity: 1 }]);
   assert.equal(body.results[1].productCostUSD, 11);
-  assert.equal(body.results[1].landedCostSAR, 133.69);
-  assert.equal(body.results[1].profitSAR, -33.69);
+  assert.equal(body.results[1].landedCostSAR, 122.44);
+  assert.equal(body.results[1].profitSAR, -22.44);
   assert.equal(body.totals.missingSkuCount, 1);
   assert.ok(calls.some(call => call.url === 'https://apilisting.fragrancex.com/token'), 'token endpoint must be mocked and called');
   assert.equal(calls.filter(call => call.url === 'https://redis.example' && JSON.parse(call.options.body)[0] === 'SET').length, 3);
@@ -159,6 +159,20 @@ const sampleWeightShipping = costApi.estimateSaudiShippingUSD([
 assert.equal(sampleWeightShipping.totalGrams, 400);
 assert.equal(sampleWeightShipping.shippingCostUSD, 14.95);
 assert.deepEqual(sampleWeightShipping.missingWeightSkus, []);
+
+const invoiceLikeCost = costApi.calculateOrderCosts({
+  orders: [{ orderId: '271465366', totalValueSAR: 0, items: [{ sku: '415861', quantity: 2 }] }],
+  catalog: { 415861: { wholesalePriceUSD: 24.72 } },
+  shippingRows: [{ countryCode: 'US', shippingRateUSD: 6.95 }],
+  vatRows: [{ countryCode: 'SA', minSubTotalUSD: 0, maxSubTotalUSD: 0, exceptionSubTotalUSD: 0, vatRate: 26.5 }],
+  usdToSarRate: 3.75,
+  weightsBySku: { 415861: 500 }
+});
+
+assert.equal(invoiceLikeCost.results[0].productCostUSD, 49.44);
+assert.equal(invoiceLikeCost.results[0].shippingCostUSD, 28.95);
+assert.equal(invoiceLikeCost.results[0].vatCostUSD, 13.1);
+assert.equal(invoiceLikeCost.results[0].landedCostSAR, 343.09);
 
 try {
   process.env.FRAGRANCEX_API_ID = 'test-id';
