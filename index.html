@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>تحديث أسعار وكميات سلة</title>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{
@@ -140,16 +140,18 @@ tr.option-row td{color:var(--text2);font-size:.72rem}
 .app > .actions{align-items:center;padding:10px;background:#ffffff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--cmd-shadow)}
 .search:focus,.field input:focus,.field select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(15,118,110,.12)}
 </style>
+<link rel="stylesheet" href="assets/ui.css">
 </head>
 <body>
 <div class="grain"></div>
 <div class="glow"></div>
 <div class="app">
   <header class="hdr">
-    <div class="badge">SALLA PRICE + QUANTITY TOOL</div>
+    <div class="badge">AATIR / BATCH DESK / 01</div>
     <h1>تحديث أسعار وكميات سلة</h1>
-    <p>ارفع ملف المورد مرة واحدة + ملف أسعار سلة + ملف كميات سلة، ثم حمّل ملفي التحديث الجاهزين للرفع</p>
+    <p>طابق مخزون المورد مع متجرك، راجع الفروقات، ثم صدّر ملفي الأسعار والكميات الجاهزين للرفع.</p>
     <div class="top-links">
+      <a class="top-link on" href="index.html">الأسعار والكميات</a>
       <a class="top-link" href="new-products.html">المنتجات الجديدة</a>
       <a class="top-link" href="fix-options.html">إصلاح الخيارات</a>
       <a class="top-link" href="translate-descriptions.html">ترجمة الأوصاف</a>
@@ -188,21 +190,21 @@ tr.option-row td{color:var(--text2);font-size:.72rem}
   <div class="uploads">
     <div class="upload-zone" onclick="this.querySelector('input').click()" id="supplierZone">
       <input type="file" id="supplierFile" accept=".xlsx,.xls,.csv" onchange="loadSupplier(event)">
-      <div class="ico">📦</div>
+      <div class="ico" aria-hidden="true">XLS</div>
       <h3>ملف المورد</h3>
       <div class="sub">AllFragrancesExcelList.xls</div>
       <div class="file-info" id="supplierInfo"></div>
     </div>
     <div class="upload-zone" onclick="this.querySelector('input').click()" id="priceStoreZone">
       <input type="file" id="priceStoreFile" accept=".xlsx,.xls,.csv" onchange="loadPriceStore(event)">
-      <div class="ico">🏷️</div>
+      <div class="ico" aria-hidden="true">SAR</div>
       <h3>ملف أسعار سلة</h3>
       <div class="sub">products-prices.xlsx</div>
       <div class="file-info" id="priceStoreInfo"></div>
     </div>
     <div class="upload-zone" onclick="this.querySelector('input').click()" id="quantityStoreZone">
       <input type="file" id="quantityStoreFile" accept=".xlsx,.xls,.csv" onchange="loadQuantityStore(event)">
-      <div class="ico">🏪</div>
+      <div class="ico" aria-hidden="true">QTY</div>
       <h3>ملف كميات سلة</h3>
       <div class="sub">product-quantities.xlsx</div>
       <div class="file-info" id="quantityStoreInfo"></div>
@@ -229,7 +231,7 @@ tr.option-row td{color:var(--text2);font-size:.72rem}
     </div>
   </details>
 
-  <button class="go-btn" id="goBtn" disabled onclick="processAll()">⚡ معالجة الأسعار والكميات</button>
+  <button class="go-btn" id="goBtn" disabled onclick="processAll()">معالجة الأسعار والكميات</button>
   <div class="prog" id="progress"><div class="bar" id="progressBar"></div></div>
   <div class="log-box" id="logBox"></div>
 
@@ -304,6 +306,10 @@ tr.option-row td{color:var(--text2);font-size:.72rem}
     </div>
     <div class="empty" id="quantityEmpty" style="display:none">لا توجد نتائج</div>
   </section>
+  <footer class="app-footer">
+    <strong>AATIR / OPERATIONS</strong>
+    <span>أداة تجهيز ملفات سلة</span>
+  </footer>
 </div>
 
 <script>

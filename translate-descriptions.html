@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ترجمة أوصاف منتجات سلة</title>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <style>
@@ -122,18 +122,20 @@ tr:hover td{background:rgba(13,148,136,.055)}
 .app > .actions{align-items:center;padding:10px;background:#ffffff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--cmd-shadow)}
 .search:focus,.field input:focus,.field select:focus,.brand-sort:focus,.preview-tools select:focus,.translated-editor:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(15,118,110,.12)}
 </style>
+<link rel="stylesheet" href="assets/ui.css">
 </head>
 <body>
 <div class="grain"></div>
 <main class="app">
   <header class="hdr">
-    <div class="badge">SALLA DESCRIPTION TRANSLATION TOOL</div>
+    <div class="badge">AATIR / BATCH DESK / 04</div>
     <h1>ترجمة أوصاف منتجات سلة</h1>
-    <p>ارفع ملف منتجات سلة الكامل وملف المورد Shopify، ثم ترجم أوصاف Shopify المطابقة بالـ SKU فقط وصدّر ملف سلة يحتوي المنتجات التي تمت ترجمتها مع خياراتها.</p>
+    <p>طابق أوصاف المورد مع منتجاتك، ترجمها حسب الماركة، وراجع النص النهائي قبل تصدير ملف سلة.</p>
     <div class="top-links">
-      <a href="index.html">الرجوع لتحديث الأسعار والكميات</a>
-      <a href="new-products.html">صفحة المنتجات الجديدة</a>
+      <a href="index.html">الأسعار والكميات</a>
+      <a href="new-products.html">المنتجات الجديدة</a>
       <a href="fix-options.html">إصلاح خيارات المنتجات</a>
+      <a class="on" href="translate-descriptions.html">ترجمة الأوصاف</a>
       <a href="prepare-orders.html">تجهيز الطلبات</a>
     </div>
   </header>
@@ -271,6 +273,10 @@ tr:hover td{background:rgba(13,148,136,.055)}
       <div class="empty" id="emptyPreview" style="display:none">لا توجد منتجات ضمن الفلاتر الحالية</div>
     </section>
   </div>
+  <footer class="app-footer">
+    <strong>AATIR / OPERATIONS</strong>
+    <span>أداة تجهيز ملفات سلة</span>
+  </footer>
 </main>
 
 <script>

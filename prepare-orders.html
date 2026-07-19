@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>تجهيز الطلبات</title>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root{
@@ -93,14 +93,15 @@ td input:focus{border-color:rgba(15,118,110,.45);background:#fff;box-shadow:0 0 
 .bad{background:var(--red-dim);color:var(--red)}
 .empty{text-align:center;padding:34px;color:var(--text3);font-size:.85rem}
 </style>
+<link rel="stylesheet" href="assets/ui.css">
 </head>
 <body>
 <div class="grain"></div>
 <main class="app">
   <header class="hdr">
-    <div class="badge">SALLA ORDER PREP TOOL</div>
+    <div class="badge">AATIR / BATCH DESK / 05</div>
     <h1>تجهيز الطلبات</h1>
-    <p>ارفع ملف طلبات سلة العربي، ثم حوّل الأسماء والعناوين وتفاصيل المنتجات إلى ملف CSV جاهز للشحن.</p>
+    <p>حوّل ملف الطلبات العربي إلى بيانات شحن منظمة، راجع تكلفة الوصول والربح، ثم صدّر CSV جاهزاً.</p>
     <div class="top-links">
       <a href="index.html">تحديث الأسعار والكميات</a>
       <a href="new-products.html">المنتجات الجديدة</a>
@@ -143,7 +144,7 @@ td input:focus{border-color:rgba(15,118,110,.45);background:#fff;box-shadow:0 0 
 
   <section class="upload-zone" id="orderZone" onclick="document.getElementById('orderFile').click()">
     <input type="file" id="orderFile" accept=".xlsx,.xls" onchange="loadOrderFile(event)">
-    <div class="ico">📦</div>
+    <div class="ico" aria-hidden="true">XLS</div>
     <h2>ملف طلبات سلة</h2>
     <div class="sub">اسحب ملف .xlsx هنا أو اضغط للاختيار</div>
     <div class="file-info" id="fileInfo"></div>
@@ -181,6 +182,10 @@ td input:focus{border-color:rgba(15,118,110,.45);background:#fff;box-shadow:0 0 
     </div>
     <div class="table-wrap" id="tableWrap"></div>
   </section>
+  <footer class="app-footer">
+    <strong>AATIR / OPERATIONS</strong>
+    <span>أداة تجهيز ملفات سلة</span>
+  </footer>
 </main>
 
 <script>
