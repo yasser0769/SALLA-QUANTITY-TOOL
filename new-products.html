@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>منتجات المورد الجديدة</title>
-<link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
@@ -132,18 +132,16 @@ tr:hover td{background:rgba(13,148,136,.055)}
 .tab.on{background:#ecfdf5;border-color:rgba(15,118,110,.34);color:var(--accent-strong);box-shadow:0 8px 18px rgba(15,118,110,.08)}
 .search:focus,.field input:focus,.field select:focus,.preview-tools select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(15,118,110,.12)}
 </style>
-<link rel="stylesheet" href="assets/ui.css">
 </head>
 <body>
 <div class="grain"></div>
 <main class="app">
   <header class="hdr">
-    <div class="badge">AATIR / BATCH DESK / 02</div>
+    <div class="badge">SALLA NEW PRODUCTS TOOL</div>
     <h1>منتجات المورد الجديدة</h1>
-    <p>اكتشف المنتجات غير الموجودة في متجرك، راجع ترجمتها وماركاتها، ثم أنشئ ملف سلة متكاملاً دون إدخال يدوي.</p>
+    <p>ارفع ملف منتجات سلة الحالي + ملف المورد CSV + ملف أسعار المورد XLS، ويمكنك إضافة ملف الماركات اختياريًا لتحديد ماركاته تلقائيًا. قالب سلة محفوظ داخل الموقع تلقائياً.</p>
     <div class="top-links">
-      <a class="top-link" href="index.html">الأسعار والكميات</a>
-      <a class="top-link on" href="new-products.html">المنتجات الجديدة</a>
+      <a class="top-link" href="index.html">الرجوع لتحديث الأسعار والكميات</a>
       <a class="top-link" href="fix-options.html">إصلاح خيارات المنتجات</a>
       <a class="top-link" href="translate-descriptions.html">ترجمة أوصاف سلة</a>
       <a class="top-link" href="prepare-orders.html">تجهيز الطلبات</a>
@@ -169,28 +167,28 @@ tr:hover td{background:rgba(13,148,136,.055)}
   <div class="uploads" id="uploadStepArea">
     <div class="upload-zone" onclick="this.querySelector('input').click()" id="sallaZone">
       <input type="file" id="sallaFile" accept=".xlsx,.xls" onchange="loadSallaProducts(event)">
-      <div class="ico" aria-hidden="true">SALLA</div>
+      <div class="ico">🏪</div>
       <h3>ملف منتجات سلة الحالي</h3>
       <div class="sub">aatir_products.xlsx</div>
       <div class="file-info" id="sallaInfo"></div>
     </div>
     <div class="upload-zone" onclick="this.querySelector('input').click()" id="supplierZone">
       <input type="file" id="supplierFile" accept=".csv" onchange="loadSupplierCsv(event)">
-      <div class="ico" aria-hidden="true">CSV</div>
+      <div class="ico">📦</div>
       <h3>ملف المورد CSV</h3>
       <div class="sub">Shopify - All Fragrances.csv</div>
       <div class="file-info" id="supplierInfo"></div>
     </div>
     <div class="upload-zone" onclick="this.querySelector('input').click()" id="priceListZone">
       <input type="file" id="priceListFile" accept=".xls,.xlsx" onchange="loadPriceListXls(event)">
-      <div class="ico" aria-hidden="true">SAR</div>
+      <div class="ico">💵</div>
       <h3>ملف أسعار المورد XLS</h3>
       <div class="sub">AllFragrancesExcelList.xls</div>
       <div class="file-info" id="priceListInfo"></div>
     </div>
     <div class="upload-zone" onclick="this.querySelector('input').click()" id="brandFileZone">
       <input type="file" id="brandFile" accept=".xlsx,.xls" onchange="loadBrandFile(event)">
-      <div class="ico" aria-hidden="true">BRAND</div>
+      <div class="ico">🏷️</div>
       <h3>ملف الماركات (اختياري)</h3>
       <div class="sub">brands.xlsx</div>
       <div class="file-info" id="brandFileInfo"></div>
@@ -303,10 +301,6 @@ tr:hover td{background:rgba(13,148,136,.055)}
     </div>
     <div class="empty" id="emptyPreview" style="display:none">لا توجد منتجات ضمن الماركات المختارة</div>
   </section>
-  <footer class="app-footer">
-    <strong>AATIR / OPERATIONS</strong>
-    <span>أداة تجهيز ملفات سلة</span>
-  </footer>
 </main>
 
 <script>

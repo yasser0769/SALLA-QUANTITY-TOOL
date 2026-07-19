@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>إصلاح خيارات منتجات سلة</title>
-<link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
@@ -99,19 +99,17 @@ tr:hover td{background:rgba(13,148,136,.055)}
 .tab.on{background:#ecfdf5;border-color:rgba(15,118,110,.34);color:var(--accent-strong);box-shadow:0 8px 18px rgba(15,118,110,.08)}
 .search:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(15,118,110,.12)}
 </style>
-<link rel="stylesheet" href="assets/ui.css">
 </head>
 <body>
 <div class="grain"></div>
 <main class="app">
   <header class="hdr">
-    <div class="badge">AATIR / BATCH DESK / 03</div>
+    <div class="badge">SALLA OPTIONS FIX TOOL</div>
     <h1>إصلاح خيارات منتجات سلة</h1>
-    <p>اكشف الأحجام المنفصلة، صنّف الحالات الآمنة، ثم أعدها كخيارات مرتبة تحت المنتج الأب.</p>
+    <p>ارفع ملف منتجات سلة الكامل + ملف المورد CSV + ملف AllFragrances، ثم راجع الحالتين وقيم الخيارات العربية قبل التصدير.</p>
     <div class="top-links">
-      <a href="index.html">الأسعار والكميات</a>
-      <a href="new-products.html">المنتجات الجديدة</a>
-      <a class="on" href="fix-options.html">إصلاح الخيارات</a>
+      <a href="index.html">الرجوع لتحديث الأسعار والكميات</a>
+      <a href="new-products.html">صفحة المنتجات الجديدة</a>
       <a href="translate-descriptions.html">ترجمة أوصاف سلة</a>
       <a href="prepare-orders.html">تجهيز الطلبات</a>
     </div>
@@ -221,10 +219,6 @@ tr:hover td{background:rgba(13,148,136,.055)}
     </div>
     <div class="empty" id="warningsEmpty" style="display:none">لا توجد تحذيرات</div>
   </section>
-  <footer class="app-footer">
-    <strong>AATIR / OPERATIONS</strong>
-    <span>أداة تجهيز ملفات سلة</span>
-  </footer>
 </main>
 
 <script>
