@@ -3,4 +3,9 @@
 !.env.example
 node_modules/
 .vercel/
+.next/
+.wrangler/
+dist/
+public/
+worker/legacy/
 .DS_Store
