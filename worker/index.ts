@@ -2,6 +2,7 @@ import handler from "vinext/server/app-router-entry";
 import prepareOrders from "./legacy/prepare-orders.cjs";
 import translateDescription from "./legacy/translate-description.cjs";
 import fragrancexCosts from "./legacy/fragrancex-costs.cjs";
+import { handleSallaWebhook } from "./salla-webhook.mjs";
 
 interface Env {
   ASSETS: Fetcher;
@@ -94,6 +95,14 @@ const worker = {
   async fetch(request: Request, env: Env | undefined, ctx: ExecutionContext): Promise<Response> {
     exposeEnvironment(env);
     const url = new URL(request.url);
+    if (url.pathname === "/api/webhooks/salla") {
+      return handleSallaWebhook(request, {
+        SALLA_WEBHOOK_SECRET:
+          typeof env?.SALLA_WEBHOOK_SECRET === "string"
+            ? env.SALLA_WEBHOOK_SECRET
+            : process.env.SALLA_WEBHOOK_SECRET,
+      });
+    }
     const apiHandler = apiHandlers.get(url.pathname);
     if (apiHandler) return invokeLegacyApi(apiHandler, request);
 
