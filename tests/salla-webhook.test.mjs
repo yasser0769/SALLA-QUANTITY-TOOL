@@ -5,6 +5,7 @@ import {
   handleSallaWebhook,
   summarizeSallaEvent,
   verifySallaSignature,
+  verifySallaToken,
 } from "../worker/salla-webhook.mjs";
 
 const secret = "test-salla-webhook-secret";
@@ -60,6 +61,21 @@ test("rejects requests with invalid signatures", async () => {
     { SALLA_WEBHOOK_SECRET: secret },
   );
   assert.equal(response.status, 401);
+});
+
+test("accepts the custom Salla webhook token used by portal headers", async () => {
+  assert.equal(verifySallaToken(secret, secret), true);
+  assert.equal(verifySallaToken("wrong", secret), false);
+  const response = await handleSallaWebhook(
+    new Request("https://example.com/api/webhooks/salla", {
+      method: "POST",
+      headers: { "X-Salla-Webhook-Token": secret },
+      body,
+    }),
+    { SALLA_WEBHOOK_SECRET: secret },
+    { info: () => {} },
+  );
+  assert.equal(response.status, 200);
 });
 
 test("reports endpoint health without exposing secrets", async () => {

@@ -44,6 +44,17 @@ export async function verifySallaSignature(rawBody, signatureHeader, secret) {
   return difference === 0;
 }
 
+export function verifySallaToken(tokenHeader, secret) {
+  const received = new TextEncoder().encode(String(tokenHeader || ""));
+  const expected = new TextEncoder().encode(String(secret || ""));
+  if (!received.length || received.length !== expected.length) return false;
+  let difference = 0;
+  for (let index = 0; index < expected.length; index += 1) {
+    difference |= expected[index] ^ received[index];
+  }
+  return difference === 0;
+}
+
 export function summarizeSallaEvent(payload) {
   const data = payload?.data ?? {};
   const merchant = payload?.merchant ?? data?.merchant ?? {};
@@ -81,8 +92,13 @@ export async function handleSallaWebhook(request, env = {}, logger = console) {
   }
 
   const signature = request.headers.get("x-salla-signature") || "";
-  if (!(await verifySallaSignature(rawBody, signature, secret))) {
-    return jsonResponse({ error: "Invalid Salla webhook signature" }, 401);
+  const customToken = request.headers.get("x-salla-webhook-token") || "";
+  const signatureValid = signature
+    ? await verifySallaSignature(rawBody, signature, secret)
+    : false;
+  const customTokenValid = verifySallaToken(customToken, secret);
+  if (!signatureValid && !customTokenValid) {
+    return jsonResponse({ error: "Invalid Salla webhook authentication" }, 401);
   }
 
   let payload;
