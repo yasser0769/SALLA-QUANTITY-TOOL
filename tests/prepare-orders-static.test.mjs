@@ -21,7 +21,7 @@ has(/cdn\.jsdelivr\.net\/npm\/xlsx@/, 'page must load SheetJS for Salla order XL
 has(/id="provider"/, 'page must include an API provider selector');
 has(/value="openrouter"/, 'page must support OpenRouter');
 has(/value="deepseek"/, 'page must support DeepSeek');
-has(/openai\/gpt-5\.6-luna/, 'OpenRouter choices must include GPT-5.6 Luna');
+has(/openai\/gpt-6-luna/, 'OpenRouter choices must include GPT-6 Luna');
 has(/deepseek\/deepseek-v4\.1-flash/, 'OpenRouter choices must include DeepSeek V4.1 Flash');
 has(/id="accessToken"/, 'page must use the shared access token instead of exposing provider API keys');
 has(/localStorage\.setItem\(STORAGE_KEY/, 'page must optionally remember the access token locally');
@@ -80,7 +80,7 @@ assert.match(api, /TRANSLATION_ACCESS_TOKEN/, 'server route must use the same tr
 assert.match(api, /defaultProvider:\s*'openrouter'/, 'order preparation API must default to OpenRouter');
 assert.match(api, /https:\/\/openrouter\.ai\/api\/v1\/chat\/completions/, 'server route must support OpenRouter upstream calls');
 assert.match(api, /https:\/\/api\.deepseek\.com\/chat\/completions/, 'server route may still support DeepSeek upstream calls');
-assert.match(api, /openai\/gpt-5\.6-luna/, 'server route must allow GPT-5.6 Luna through OpenRouter');
+assert.match(api, /openai\/gpt-6-luna/, 'server route must allow GPT-6 Luna through OpenRouter');
 assert.match(api, /deepseek\/deepseek-v4\.1-flash/, 'server route must allow DeepSeek V4.1 Flash through OpenRouter');
 
 const costApiPath = 'api/fragrancex-costs.js';

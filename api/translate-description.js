@@ -4,7 +4,7 @@ const ALLOWED_MODELS = new Set(['deepseek-v4-flash', 'deepseek-v4-pro']);
 const ALLOWED_BRAND_MODELS = new Set([
   'openai/gpt-4o-mini',
   'google/gemini-2.5-flash',
-  'openai/gpt-5.6-luna',
+  'openai/gpt-6-luna',
   'deepseek/deepseek-v4.1-flash'
 ]);
 const ALLOWED_OPERATIONS = new Set(['translate', 'review', 'health', 'brand_translate', 'brand_health']);

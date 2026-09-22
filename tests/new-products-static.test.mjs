@@ -34,7 +34,7 @@ has(/id="brandReviewBody"/, 'new-brand review must render editable rows');
 has(/id="brandTranslationModel"/, 'new-brand review must include an OpenRouter model selector');
 has(/id="brandAccessToken"/, 'new-brand translation must use the protected shared access token');
 has(/value="openai\/gpt-4o-mini"/, 'new-brand translation must provide an OpenRouter model');
-has(/value="openai\/gpt-5\.6-luna"/, 'new-brand translation must offer GPT-5.6 Luna through OpenRouter');
+has(/value="openai\/gpt-6-luna"/, 'new-brand translation must offer GPT-6 Luna through OpenRouter');
 has(/value="deepseek\/deepseek-v4\.1-flash"/, 'new-brand translation must offer DeepSeek V4.1 Flash through OpenRouter');
 has(/function\s+initializeBrandExportRows/, 'page must initialize export rows from unregistered brands');
 has(/function\s+renderBrandReview/, 'page must render the editable brand review table');

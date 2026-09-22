@@ -54,7 +54,7 @@ try {
 
   const translated = await invoke({
     operation: 'brand_translate',
-    model: 'openai/gpt-5.6-luna',
+    model: 'openai/gpt-6-luna',
     brands: ['Nine West']
   });
   assert.equal(translated.status, 200);
