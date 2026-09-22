@@ -21,6 +21,8 @@ has(/cdn\.jsdelivr\.net\/npm\/xlsx@/, 'page must load SheetJS for Salla order XL
 has(/id="provider"/, 'page must include an API provider selector');
 has(/value="openrouter"/, 'page must support OpenRouter');
 has(/value="deepseek"/, 'page must support DeepSeek');
+has(/openai\/gpt-5\.6-luna/, 'OpenRouter choices must include GPT-5.6 Luna');
+has(/deepseek\/deepseek-v4\.1-flash/, 'OpenRouter choices must include DeepSeek V4.1 Flash');
 has(/id="accessToken"/, 'page must use the shared access token instead of exposing provider API keys');
 has(/localStorage\.setItem\(STORAGE_KEY/, 'page must optionally remember the access token locally');
 has(/\/api\/prepare-orders/, 'page must call the protected order preparation API route');
@@ -59,6 +61,11 @@ has(/function\s+toggleOrderSelection/, 'page must support selecting one order ro
 has(/function\s+toggleVisibleSelection/, 'page must support selecting visible rows as a group');
 has(/function\s+deleteSelectedOrders/, 'page must support deleting selected orders');
 has(/حذف المحدد/, 'preview controls must include an Arabic delete selected action');
+has(/id="placeSelectedBtn"/, 'preview controls must include a FragranceX placement action');
+has(/تنفيذ المحدد على FragranceX/, 'placement action must clearly identify FragranceX');
+has(/function\s+placeSelectedOrders/, 'page must implement selected-order placement');
+has(/\/api\/fragrancex-orders/, 'page must call the protected FragranceX ordering route');
+has(/الخصم من البطاقة الافتراضية/, 'page must warn about the default-card charge before placement');
 has(/outputRows\s*=\s*outputRows\.filter\(\(row\)\s*=>\s*!\s*selectedOrderKeys\.has\(row\.__rowKey\)\)/, 'delete action must remove selected rows from the export data');
 has(/prepared_orders_\$\{new Date\(\)\.toISOString\(\)\.slice\(0,10\)\}\.csv/, 'export filename must include the current date');
 assert.doesNotMatch(
@@ -73,6 +80,8 @@ assert.match(api, /TRANSLATION_ACCESS_TOKEN/, 'server route must use the same tr
 assert.match(api, /defaultProvider:\s*'openrouter'/, 'order preparation API must default to OpenRouter');
 assert.match(api, /https:\/\/openrouter\.ai\/api\/v1\/chat\/completions/, 'server route must support OpenRouter upstream calls');
 assert.match(api, /https:\/\/api\.deepseek\.com\/chat\/completions/, 'server route may still support DeepSeek upstream calls');
+assert.match(api, /openai\/gpt-5\.6-luna/, 'server route must allow GPT-5.6 Luna through OpenRouter');
+assert.match(api, /deepseek\/deepseek-v4\.1-flash/, 'server route must allow DeepSeek V4.1 Flash through OpenRouter');
 
 const costApiPath = 'api/fragrancex-costs.js';
 assert.ok(fs.existsSync(costApiPath), 'FragranceX supplier cost API route must exist');
@@ -91,3 +100,13 @@ assert.match(costApi, /SA_WEIGHT_SHIPPING_TIERS/, 'cost API must price Saudi shi
 assert.match(costApi, /USD_TO_SAR_RATE/, 'cost API must convert FragranceX USD costs into SAR values');
 assert.doesNotMatch(costApi, /FRAGRANCEX_API_KEY\s*=\s*['"][^'"]+['"]/, 'cost API must not contain a hard-coded FragranceX API key');
 assert.doesNotMatch(costApi, /FRAGRANCEX_API_ID\s*=\s*['"][^'"]+['"]/, 'cost API must not contain a hard-coded FragranceX API ID');
+
+const orderApiPath = 'api/fragrancex-orders.js';
+assert.ok(fs.existsSync(orderApiPath), 'FragranceX order placement API route must exist');
+const orderApi = fs.readFileSync(orderApiPath, 'utf8');
+assert.match(orderApi, /https:\/\/apiordering\.fragrancex\.com\/order\/PlaceBulkOrder\//, 'order API must call the official bulk placement endpoint');
+assert.match(orderApi, /INTERNATIONAL_STANDARD_SHIPPING\s*=\s*3/, 'Saudi orders must use FragranceX international standard shipping');
+assert.match(orderApi, /PaymentMethod:\s*'cc'/, 'order API must use the account default credit card');
+assert.match(orderApi, /IsDropship:\s*true/, 'order API must mark direct-to-customer orders as dropship');
+assert.match(orderApi, /TRANSLATION_ACCESS_TOKEN/, 'order API must require server-side access protection');
+assert.doesNotMatch(orderApi, /FRAGRANCEX_API_KEY\s*=\s*['"][^'"]+['"]/, 'order API must not contain a hard-coded FragranceX API key');

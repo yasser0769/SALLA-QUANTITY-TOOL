@@ -1,6 +1,13 @@
 const DEEPSEEK_ENDPOINT = 'https://api.deepseek.com/chat/completions';
+const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 const ALLOWED_MODELS = new Set(['deepseek-v4-flash', 'deepseek-v4-pro']);
-const ALLOWED_OPERATIONS = new Set(['translate', 'review', 'health']);
+const ALLOWED_BRAND_MODELS = new Set([
+  'openai/gpt-4o-mini',
+  'google/gemini-2.5-flash',
+  'openai/gpt-5.6-luna',
+  'deepseek/deepseek-v4.1-flash'
+]);
+const ALLOWED_OPERATIONS = new Set(['translate', 'review', 'health', 'brand_translate', 'brand_health']);
 
 function sendJson(response, statusCode, payload) {
   response.statusCode = statusCode;
@@ -97,11 +104,76 @@ function parseModelJsonSafely(text, operation) {
   }
 }
 
+function parseBrandTranslations(text) {
+  const raw = stripCodeFence(text);
+  if (!raw) throw new Error('OpenRouter returned empty JSON content');
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (firstError) {
+    const extracted = extractJsonObject(raw);
+    if (!extracted) throw new Error(`تعذر قراءة رد OpenRouter كـ JSON: ${safeModelExcerpt(raw)}`);
+    try {
+      parsed = JSON.parse(extracted);
+    } catch (secondError) {
+      throw new Error(`تعذر قراءة رد OpenRouter كـ JSON: ${safeModelExcerpt(raw)}`);
+    }
+  }
+  const items = Array.isArray(parsed) ? parsed : (parsed.brands || parsed.results || []);
+  if (!Array.isArray(items)) throw new Error('OpenRouter brand response is not an array');
+  return items
+    .map(item => ({
+      brand: String(item?.brand || '').trim(),
+      arabicName: String(item?.arabicName || item?.arabic || '').replace(/\s+/g, ' ').trim()
+    }))
+    .filter(item => item.brand && item.arabicName);
+}
+
+async function translateBrandsWithOpenRouter({ model, brands }) {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    const error = new Error('OPENROUTER_API_KEY is not configured in Vercel');
+    error.statusCode = 500;
+    throw error;
+  }
+  const upstream = await fetch(OPENROUTER_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+      'HTTP-Referer': process.env.SITE_URL || 'https://salla-quantity-tool.vercel.app',
+      'X-Title': 'Salla New Brands'
+    },
+    body: JSON.stringify({
+      model,
+      response_format: { type: 'json_object' },
+      stream: false,
+      temperature: 0,
+      max_tokens: 4096,
+      messages: [
+        {
+          role: 'system',
+          content: 'You transliterate perfume and fashion brand names into their common Arabic spelling. Do not translate meanings and do not add the word عطور. Preserve every input brand exactly in the brand field. Return JSON only in this shape: {"brands":[{"brand":"English input","arabicName":"الاسم العربي"}]}.'
+        },
+        { role: 'user', content: JSON.stringify({ brands }) }
+      ]
+    })
+  });
+  if (!upstream.ok) {
+    const error = new Error(await upstream.text());
+    error.statusCode = upstream.status;
+    throw error;
+  }
+  const data = await upstream.json();
+  return parseBrandTranslations(data.choices?.[0]?.message?.content || '');
+}
+
 async function handler(request, response) {
   if (request.method === 'GET') {
     return sendJson(response, 200, {
       ok: true,
       deepseekConfigured: Boolean(process.env.DEEPSEEK_API_KEY),
+      openrouterConfigured: Boolean(process.env.OPENROUTER_API_KEY),
       accessTokenConfigured: Boolean(process.env.TRANSLATION_ACCESS_TOKEN)
     });
   }
@@ -111,12 +183,7 @@ async function handler(request, response) {
     return sendJson(response, 405, { error: 'Method not allowed' });
   }
 
-  const apiKey = process.env.DEEPSEEK_API_KEY;
   const accessToken = process.env.TRANSLATION_ACCESS_TOKEN;
-
-  if (!apiKey) {
-    return sendJson(response, 500, { error: 'DEEPSEEK_API_KEY is not configured in Vercel' });
-  }
 
   const providedToken = request.headers['x-translation-access-token'];
   if (accessToken && providedToken !== accessToken) {
@@ -133,9 +200,39 @@ async function handler(request, response) {
   const operation = String(payload.operation || '');
   const model = String(payload.model || 'deepseek-v4-flash');
   const messages = Array.isArray(payload.messages) ? payload.messages : [];
+  const brands = Array.isArray(payload.brands) ? payload.brands.map(value => String(value || '').trim()).filter(Boolean) : [];
 
   if (!ALLOWED_OPERATIONS.has(operation)) {
     return sendJson(response, 400, { error: 'Unsupported translation operation' });
+  }
+  if (operation === 'brand_health') {
+    return sendJson(response, 200, {
+      ok: Boolean(process.env.OPENROUTER_API_KEY),
+      provider: 'openrouter',
+      configured: Boolean(process.env.OPENROUTER_API_KEY),
+      error: process.env.OPENROUTER_API_KEY ? undefined : 'OPENROUTER_API_KEY is not configured in Vercel'
+    });
+  }
+  if (operation === 'brand_translate') {
+    if (!ALLOWED_BRAND_MODELS.has(model)) {
+      return sendJson(response, 400, { error: 'Unsupported OpenRouter brand model' });
+    }
+    if (!brands.length) {
+      return sendJson(response, 400, { error: 'Brands are required' });
+    }
+    if (brands.length > 50) {
+      return sendJson(response, 400, { error: 'Brand batch size cannot exceed 50' });
+    }
+    try {
+      const results = await translateBrandsWithOpenRouter({ model, brands });
+      return sendJson(response, 200, { ok: true, results });
+    } catch (error) {
+      return sendJson(response, error.statusCode || 500, { error: error.message || 'Brand translation failed' });
+    }
+  }
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey) {
+    return sendJson(response, 500, { error: 'DEEPSEEK_API_KEY is not configured in Vercel' });
   }
   if (!ALLOWED_MODELS.has(model)) {
     return sendJson(response, 400, { error: 'Unsupported DeepSeek model' });
@@ -189,4 +286,5 @@ async function handler(request, response) {
 
 module.exports = handler;
 module.exports.parseModelJsonSafely = parseModelJsonSafely;
+module.exports.parseBrandTranslations = parseBrandTranslations;
 module.exports.safeModelExcerpt = safeModelExcerpt;

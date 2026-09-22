@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { parseModelJsonSafely } = require('../api/translate-description.js');
+const { parseModelJsonSafely, parseBrandTranslations } = require('../api/translate-description.js');
 
 assert.equal(typeof parseModelJsonSafely, 'function', 'parser must be exported for unit tests');
+assert.equal(typeof parseBrandTranslations, 'function', 'brand parser must be exported for unit tests');
 
 {
   const result = parseModelJsonSafely('{"translated":"وصف عربي جميل"}', 'translate');
@@ -30,4 +31,14 @@ assert.equal(typeof parseModelJsonSafely, 'function', 'parser must be exported f
   assert.equal(result.ok, false);
   assert.match(result.reasons.join(' '), /تعذر قراءة رد DeepSeek/);
   assert.equal(result.fallbackUsed, true);
+}
+
+{
+  const result = parseBrandTranslations('{"brands":[{"brand":"A Lab on Fire","arabicName":"اي لاب اون فاير"}]}');
+  assert.deepEqual(result, [{ brand: 'A Lab on Fire', arabicName: 'اي لاب اون فاير' }]);
+}
+
+{
+  const result = parseBrandTranslations('```json\n{"results":[{"brand":"Adidas","arabic":"اديداس"}]}\n```');
+  assert.deepEqual(result, [{ brand: 'Adidas', arabicName: 'اديداس' }]);
 }

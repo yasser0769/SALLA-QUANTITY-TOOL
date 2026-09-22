@@ -23,7 +23,7 @@ for (const [source, target] of htmlFiles) {
 await cp(join(root, "assets"), join(publicDir, "assets"), { recursive: true });
 await cp(join(root, "assets", "og.png"), join(publicDir, "og.png"));
 
-for (const name of ["prepare-orders", "translate-description"]) {
+for (const name of ["prepare-orders", "translate-description", "fragrancex-orders"]) {
   await cp(join(root, "api", `${name}.js`), join(legacyDir, `${name}.cjs`));
 }
 

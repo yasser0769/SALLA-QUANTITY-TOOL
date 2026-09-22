@@ -57,6 +57,8 @@ h1{font-size:clamp(1.55rem,3vw,2.1rem);font-weight:700;margin-bottom:8px}
 .btn:hover:not(:disabled){border-color:rgba(15,118,110,.42);background:#fff;box-shadow:0 10px 22px rgba(15,23,42,.09);transform:translateY(-1px)}
 .btn.primary{background:linear-gradient(135deg,#0f766e,#155e75);border-color:transparent;color:#fff;box-shadow:0 14px 28px rgba(15,118,110,.18)}
 .btn.primary:hover:not(:disabled){background:linear-gradient(135deg,#115e59,#1d4ed8);box-shadow:var(--hover-shadow);transform:translateY(-2px)}
+.btn.order-action{background:linear-gradient(135deg,#1d4ed8,#4338ca);border-color:transparent;color:#fff;box-shadow:0 14px 28px rgba(37,99,235,.18)}
+.btn.order-action:hover:not(:disabled){background:linear-gradient(135deg,#1e40af,#3730a3);box-shadow:var(--hover-shadow)}
 .btn:disabled{opacity:.38;cursor:not-allowed;box-shadow:none;transform:none}
 .progress{height:4px;background:var(--surface2);border-radius:4px;margin-bottom:16px;overflow:hidden;display:none}
 .progress .bar{height:100%;background:linear-gradient(90deg,var(--accent),var(--blue),var(--amber));width:0;transition:width .25s}
@@ -69,7 +71,7 @@ h1{font-size:clamp(1.55rem,3vw,2.1rem);font-weight:700;margin-bottom:8px}
 .panel.on{display:block}
 .panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
 .panel h2{font-size:1.05rem}
-.preview-tools{display:grid;grid-template-columns:minmax(220px,1fr) auto auto auto;gap:8px;margin-bottom:12px;align-items:center}
+.preview-tools{display:grid;grid-template-columns:minmax(220px,1fr) auto auto auto auto;gap:8px;margin-bottom:12px;align-items:center}
 .search{width:100%;padding:10px 12px;background:#ffffff;border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;outline:none;min-height:42px}
 @media(max-width:760px){.preview-tools{grid-template-columns:1fr}.actions .btn{width:100%}}
 .table-wrap{background:#fff;border:1px solid var(--border);border-radius:var(--radius);overflow:auto;max-height:62vh;box-shadow:var(--shadow)}
@@ -175,6 +177,7 @@ td input:focus{border-color:rgba(15,118,110,.45);background:#fff;box-shadow:0 0 
     </div>
     <div class="preview-tools">
       <input class="search" id="previewSearch" type="search" placeholder="بحث في رقم الطلب، الاسم، المدينة، الجوال، أو SKU..." oninput="renderPreview()">
+      <button class="btn order-action" id="placeSelectedBtn" onclick="placeSelectedOrders()" disabled>تنفيذ المحدد على FragranceX</button>
       <button class="btn" onclick="downloadCSV()">تحميل CSV</button>
       <button class="btn" onclick="copyCSV()">نسخ CSV</button>
       <button class="btn" id="deleteSelectedBtn" onclick="deleteSelectedOrders()" disabled>حذف المحدد</button>
@@ -187,12 +190,14 @@ td input:focus{border-color:rgba(15,118,110,.45);background:#fff;box-shadow:0 0 
 const STORAGE_KEY = 'salla_prepare_orders_settings';
 const API_TIMEOUT_MS = 90000;
 const CSV_HEADERS = ['COrderID','FirstName','LastName','Address','Address2','City','State','Zip','Country','ShipMethod','Phone','OrderDetails','GiftWrap','Message'];
-const COST_PREVIEW_HEADERS = ['تكلفة المورد','الشحن','VAT','تكلفة الوصول','الربح المتوقع','حالة المورد'];
+const COST_PREVIEW_HEADERS = ['تكلفة المورد','الشحن','VAT','تكلفة الوصول','الربح المتوقع','حالة المورد','رقم FragranceX','نتيجة التنفيذ'];
 const MODEL_OPTIONS = {
   openrouter: [
     ['anthropic/claude-sonnet-4', 'Claude Sonnet 4'],
     ['google/gemini-2.5-flash', 'Gemini 2.5 Flash'],
     ['openai/gpt-4o-mini', 'GPT-4o Mini'],
+    ['openai/gpt-5.6-luna', 'GPT-5.6 Luna'],
+    ['deepseek/deepseek-v4.1-flash', 'DeepSeek V4.1 Flash'],
     ['deepseek/deepseek-chat', 'DeepSeek Chat عبر OpenRouter'],
     ['deepseek/deepseek-r1', 'DeepSeek R1 عبر OpenRouter']
   ],
@@ -210,6 +215,7 @@ let outputRows = [];
 let selectedOrderKeys = new Set();
 let supplierCostMeta = null;
 let processing = false;
+let placingOrders = false;
 
 function $(id){return document.getElementById(id)}
 function log(message){
@@ -255,10 +261,12 @@ function toggleAccessToken(){
   document.querySelector('.icon-btn').textContent = input.type === 'password' ? 'عرض' : 'إخفاء';
 }
 function checkReady(){
-  $('processBtn').disabled = processing || !orderFile;
+  $('processBtn').disabled = processing || placingOrders || !orderFile;
   $('exportBtn').disabled = outputRows.length === 0;
   const deleteButton = $('deleteSelectedBtn');
-  if (deleteButton) deleteButton.disabled = selectedOrderKeys.size === 0;
+  if (deleteButton) deleteButton.disabled = placingOrders || selectedOrderKeys.size === 0;
+  const placeButton = $('placeSelectedBtn');
+  if (placeButton) placeButton.disabled = placingOrders || selectedOrderKeys.size === 0;
 }
 function loadOrderFile(event){
   const file = event.target.files?.[0];
@@ -684,7 +692,12 @@ function mapOrderData(raw, aiResults){
       __supplierMissingSkus: [],
       __supplierMissingWeightSkus: [],
       __supplierStatus: '',
-      __supplierError: ''
+      __supplierError: '',
+      __fragrancexOrderId: '',
+      __fragrancexResultCode: null,
+      __fragrancexStatus: '',
+      __fragrancexMessage: '',
+      __fragrancexGrandTotalUSD: 0
     };
   });
 }
@@ -746,8 +759,18 @@ function costPreviewCells(row){
     `<td class="cost-cell">${formatCurrency(row.__supplierVatCost)}</td>`,
     `<td class="cost-cell">${formatCurrency(row.__supplierLandedCost)}</td>`,
     `<td class="cost-cell ${profitClass}">${formatCurrency(profit)}</td>`,
-    `<td class="cost-status">${escapeHtml(costStatusLabel(row))}</td>`
+    `<td class="cost-status">${escapeHtml(costStatusLabel(row))}</td>`,
+    `<td class="cost-cell">${escapeHtml(row.__fragrancexOrderId || '—')}</td>`,
+    `<td class="cost-status">${escapeHtml(orderExecutionLabel(row))}</td>`
   ].join('');
+}
+function orderExecutionLabel(row){
+  if (!row.__fragrancexStatus) return 'لم يُرسل';
+  const total = Number(row.__fragrancexGrandTotalUSD) || 0;
+  const totalText = total > 0 ? ` • $${total.toFixed(2)}` : '';
+  if (row.__fragrancexStatus === 'success') return `تم التنفيذ${totalText}`;
+  if (row.__fragrancexStatus === 'warning') return `تم مع تنبيه${totalText}${row.__fragrancexMessage ? `: ${row.__fragrancexMessage}` : ''}`;
+  return row.__fragrancexMessage || 'رفض FragranceX الطلب';
 }
 function renderPreview(){
   const rows = filteredRows();
@@ -775,6 +798,22 @@ function renderPreview(){
 function editCell(index, key, value){
   if (!outputRows[index]) return;
   outputRows[index][key] = value;
+  if (key === 'OrderDetails') {
+    outputRows[index].__supplierItems = parsePreparedOrderItems(value);
+    outputRows[index].__supplierStatus = '';
+    outputRows[index].__supplierMissingSkus = [];
+  }
+}
+function parsePreparedOrderItems(value){
+  const bySku = new Map();
+  for (const part of String(value || '').split('|')) {
+    const [quantityValue, skuValue] = part.split(',').map((item) => String(item || '').trim());
+    const sku = String(skuValue || '').replace(/[^\d]/g, '');
+    const quantity = Number.parseInt(quantityValue, 10);
+    if (!sku || !Number.isInteger(quantity) || quantity < 1) continue;
+    bySku.set(sku, (bySku.get(sku) || 0) + quantity);
+  }
+  return [...bySku.entries()].map(([sku, quantity]) => ({ sku, quantity }));
 }
 function toggleOrderSelection(rowKey, checked){
   if (checked) selectedOrderKeys.add(rowKey);
@@ -800,6 +839,117 @@ function updateSelectionUi(rows){
   if (deleteButton) {
     deleteButton.disabled = selectedOrderKeys.size === 0;
     deleteButton.textContent = selectedOrderKeys.size ? `حذف المحدد (${selectedOrderKeys.size})` : 'حذف المحدد';
+  }
+  const placeButton = $('placeSelectedBtn');
+  if (placeButton) {
+    placeButton.disabled = placingOrders || selectedOrderKeys.size === 0;
+    placeButton.textContent = placingOrders
+      ? 'جارٍ التنفيذ...'
+      : selectedOrderKeys.size
+        ? `تنفيذ المحدد على FragranceX (${selectedOrderKeys.size})`
+        : 'تنفيذ المحدد على FragranceX';
+  }
+}
+
+function selectedRows(){
+  return outputRows.filter((row) => selectedOrderKeys.has(row.__rowKey));
+}
+function validateOrderForPlacement(row){
+  const required = [
+    ['COrderID','رقم الطلب'],['FirstName','الاسم الأول'],['LastName','اسم العائلة'],
+    ['Address','العنوان'],['City','المدينة'],['State','المنطقة'],['Zip','الرمز البريدي'],['Phone','الجوال']
+  ];
+  const missing = required.filter(([key]) => !String(row[key] || '').trim()).map(([,label]) => label);
+  if (missing.length) return `طلب ${row.COrderID || 'بدون رقم'} ناقص: ${missing.join('، ')}`;
+  if (!Array.isArray(row.__supplierItems) || row.__supplierItems.length === 0) return `طلب ${row.COrderID}: لا يحتوي SKU صالحًا`;
+  if (row.__supplierStatus !== 'ok') return `طلب ${row.COrderID}: لم يجتز فحص مخزون وتكلفة FragranceX`;
+  if (Array.isArray(row.__supplierMissingSkus) && row.__supplierMissingSkus.length) return `طلب ${row.COrderID}: يحتوي SKU غير موجود لدى FragranceX`;
+  return '';
+}
+function orderPlacementPayload(rows){
+  return rows.map((row) => ({
+    referenceId: String(row.COrderID),
+    shippingAddress: {
+      firstName: row.FirstName,
+      lastName: row.LastName,
+      address1: row.Address,
+      address2: row.Address2,
+      city: row.City,
+      state: row.State,
+      zipcode: row.Zip,
+      country: 'SA',
+      phone: row.Phone
+    },
+    items: row.__supplierItems.map((item) => ({ itemId: item.sku, quantity: item.quantity })),
+    isGiftWrapped: String(row.GiftWrap || '').trim().toLowerCase() === 'y',
+    giftWrapMessage: row.Message || ''
+  }));
+}
+function parseOrderPlacementError(status, text){
+  let message = '';
+  try { message = JSON.parse(text)?.error || ''; } catch { message = String(text || ''); }
+  if (status === 401 || /Invalid translation access token/i.test(message)) return 'رمز الدخول غير صحيح لتنفيذ الطلبات.';
+  if (/TRANSLATION_ACCESS_TOKEN/i.test(message)) return 'حماية تنفيذ الطلبات غير مهيأة في الخادم.';
+  if (/FRAGRANCEX_API_ID|FRAGRANCEX_API_KEY/i.test(message)) return 'مفاتيح FragranceX غير مضافة في الخادم.';
+  return `تعذر تنفيذ الطلبات (${status}): ${message.slice(0, 600)}`;
+}
+function applyOrderPlacementResults(results){
+  const byReferenceId = new Map((results || []).map((item) => [String(item.referenceId), item]));
+  for (const row of outputRows) {
+    const result = byReferenceId.get(String(row.COrderID));
+    if (!result) continue;
+    row.__fragrancexOrderId = result.orderId || '';
+    row.__fragrancexResultCode = Number(result.resultCode);
+    row.__fragrancexStatus = result.status || 'failed';
+    row.__fragrancexMessage = result.message || '';
+    row.__fragrancexGrandTotalUSD = Number(result.grandTotalUSD) || 0;
+    if (result.status === 'success' || result.status === 'warning') selectedOrderKeys.delete(row.__rowKey);
+  }
+}
+async function placeSelectedOrders(){
+  if (placingOrders || selectedOrderKeys.size === 0) return;
+  const accessToken = $('accessToken').value.trim();
+  if (!accessToken) {
+    log('أدخل رمز الدخول أولًا.');
+    return;
+  }
+  placingOrders = true;
+  checkReady();
+  renderPreview();
+  try {
+    let rows = selectedRows();
+    log(`إعادة فحص مخزون وتكلفة ${rows.length} طلب قبل التنفيذ...`);
+    await fetchSupplierCosts(rows, accessToken);
+    rows = selectedRows();
+    const validationError = rows.map(validateOrderForPlacement).find(Boolean);
+    if (validationError) throw new Error(validationError);
+    const estimatedSAR = rows.reduce((sum, row) => sum + (Number(row.__supplierLandedCost) || 0), 0);
+    const confirmed = confirm(`سيتم إرسال ${rows.length} طلب إلى FragranceX والخصم من البطاقة الافتراضية بالحساب.\n\nالتكلفة التقديرية: ${formatCurrency(estimatedSAR)}\nالشحن: International Standard\n\nلا يمكن إلغاء الطلب بعد تنفيذه. هل تريد المتابعة؟`);
+    if (!confirmed) {
+      log('تم إلغاء التنفيذ قبل إرسال أي طلب إلى FragranceX.');
+      return;
+    }
+    log(`إرسال ${rows.length} طلب إلى FragranceX...`);
+    const response = await fetch('/api/fragrancex-orders', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Translation-Access-Token': accessToken
+      },
+      body: JSON.stringify({ orders: orderPlacementPayload(rows) })
+    });
+    if (!response.ok) throw new Error(parseOrderPlacementError(response.status, await response.text()));
+    const data = await response.json();
+    applyOrderPlacementResults(data.results);
+    const successful = data.results.filter((item) => item.status === 'success' || item.status === 'warning').length;
+    const failed = data.results.length - successful;
+    log(`اكتمل رد FragranceX: نجح ${successful}، فشل ${failed}${data.bulkOrderId ? `، رقم الدفعة ${data.bulkOrderId}` : ''}.`);
+  } catch (error) {
+    log(`خطأ تنفيذ FragranceX: ${error.message}`);
+  } finally {
+    placingOrders = false;
+    checkReady();
+    renderPreview();
   }
 }
 function deleteSelectedOrders(){

@@ -16,8 +16,10 @@ function notHas(pattern, message) {
 }
 
 has(/process\.env\.DEEPSEEK_API_KEY/, 'API route must read DeepSeek key from Vercel env');
+has(/process\.env\.OPENROUTER_API_KEY/, 'API route must read OpenRouter key for brand transliteration');
 has(/process\.env\.TRANSLATION_ACCESS_TOKEN/, 'API route must read access token from Vercel env');
 has(/https:\/\/api\.deepseek\.com\/chat\/completions/, 'API route must call DeepSeek server-side');
+has(/https:\/\/openrouter\.ai\/api\/v1\/chat\/completions/, 'API route must call OpenRouter server-side for brands');
 has(/response_format\s*:\s*\{\s*type\s*:\s*['"]json_object['"]\s*\}/, 'API route must request JSON object responses from DeepSeek');
 has(/function\s+parseModelJsonSafely/, 'API route must parse model JSON with a tolerant fallback');
 has(/fallbackUsed/, 'API route must mark when a fallback parser was used');
@@ -30,6 +32,10 @@ has(/max_tokens/, 'API route must set max_tokens to avoid truncated JSON respons
 has(/translate/, 'API route must support translation requests');
 has(/review/, 'API route must support review requests');
 has(/health/, 'API route must support health/preflight requests');
+has(/brand_translate/, 'API route must support brand transliteration requests');
+has(/brand_health/, 'API route must support OpenRouter brand preflight requests');
+has(/function\s+parseBrandTranslations/, 'API route must parse structured brand transliterations');
+has(/brands\.length\s*>\s*50/, 'API route must cap brand translation batch size');
 has(/request\.method\s*===\s*['"]GET['"]/, 'API route must expose a safe GET diagnostics response');
 has(/accessToken\s*&&\s*providedToken\s*!==\s*accessToken/, 'API route must require the access token only when the env token is configured');
 has(/401/, 'API route must reject invalid access tokens when protection is configured');

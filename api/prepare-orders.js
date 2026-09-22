@@ -6,6 +6,8 @@ const ALLOWED_MODELS = {
     'anthropic/claude-sonnet-4',
     'google/gemini-2.5-flash',
     'openai/gpt-4o-mini',
+    'openai/gpt-5.6-luna',
+    'deepseek/deepseek-v4.1-flash',
     'deepseek/deepseek-chat',
     'deepseek/deepseek-r1'
   ]),

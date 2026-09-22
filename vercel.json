@@ -1,0 +1,46 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/fragrancex-costs.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["data/fragrancex-weights.json"]
+      }
+    },
+    {
+      "src": "api/prepare-orders.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/fragrancex-orders.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/translate-description.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "*.html",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "assets/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/([^.]*)",
+      "dest": "/api/$1.js"
+    },
+    {
+      "src": "/",
+      "dest": "/index.html"
+    },
+    {
+      "handle": "filesystem"
+    }
+  ]
+}

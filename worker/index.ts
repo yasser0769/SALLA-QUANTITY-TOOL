@@ -2,6 +2,7 @@ import handler from "vinext/server/app-router-entry";
 import prepareOrders from "./legacy/prepare-orders.cjs";
 import translateDescription from "./legacy/translate-description.cjs";
 import fragrancexCosts from "./legacy/fragrancex-costs.cjs";
+import fragrancexOrders from "./legacy/fragrancex-orders.cjs";
 import { handleSallaWebhook } from "./salla-webhook.mjs";
 
 interface Env {
@@ -66,6 +67,7 @@ const apiHandlers = new Map<string, LegacyHandler>([
   ["/api/prepare-orders", prepareOrders],
   ["/api/translate-description", translateDescription],
   ["/api/fragrancex-costs", fragrancexCosts],
+  ["/api/fragrancex-orders", fragrancexOrders],
 ]);
 
 async function serveTool(request: Request, env: Env | undefined): Promise<Response> {
