@@ -22,6 +22,10 @@
       "use": "@vercel/node"
     },
     {
+      "src": "api/check-description.js",
+      "use": "@vercel/node"
+    },
+    {
       "src": "*.html",
       "use": "@vercel/static"
     },

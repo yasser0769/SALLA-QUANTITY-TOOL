@@ -1,4 +1,10 @@
 SALLA-CONNECTOR/
 WHATSAPP-CART/
 output/
+.env*
+node_modules/
+.wrangler/
+dist/
+public/
+worker/legacy/
 .tmp/

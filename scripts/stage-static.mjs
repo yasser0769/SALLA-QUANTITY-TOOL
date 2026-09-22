@@ -9,6 +9,7 @@ const htmlFiles = [
   ["new-products.html", "new-products.html"],
   ["fix-options.html", "fix-options.html"],
   ["translate-descriptions.html", "translate-descriptions.html"],
+  ["check-descriptions.html", "check-descriptions.html"],
   ["prepare-orders.html", "prepare-orders.html"],
 ];
 
@@ -23,7 +24,7 @@ for (const [source, target] of htmlFiles) {
 await cp(join(root, "assets"), join(publicDir, "assets"), { recursive: true });
 await cp(join(root, "assets", "og.png"), join(publicDir, "og.png"));
 
-for (const name of ["prepare-orders", "translate-description", "fragrancex-orders"]) {
+for (const name of ["prepare-orders", "translate-description", "check-description", "fragrancex-orders"]) {
   await cp(join(root, "api", `${name}.js`), join(legacyDir, `${name}.cjs`));
 }
 
