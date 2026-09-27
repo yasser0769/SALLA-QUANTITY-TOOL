@@ -50,6 +50,24 @@ assert.equal(built.Orders[0].ShippingMethod, 3);
 assert.equal(built.Orders[0].ReferenceId, 'SALLA-1001');
 assert.equal(built.Orders[0].IsDropship, true);
 assert.deepEqual(built.Orders[0].OrderItems, [{ ItemId: '567086', Quantity: 1 }]);
+const sixtyCharacters = 'A'.repeat(60);
+assert.equal(orderApi.buildBulkOrder([sampleOrder({ shippingAddress: { ...sampleOrder().shippingAddress, address1: sixtyCharacters } })]).Orders[0].ShippingAddress.Address1, sixtyCharacters);
+const longAddress = 'Al Yasmin District, King Abdulaziz Street, Building 123, Apartment 456';
+const splitAddress = orderApi.buildBulkOrder([sampleOrder({ shippingAddress: { ...sampleOrder().shippingAddress, address1: longAddress } })]).Orders[0].ShippingAddress;
+assert.ok(splitAddress.Address1.length <= 60);
+assert.equal(splitAddress.Address1, 'Al Yasmin District, King Abdulaziz Street');
+assert.equal(splitAddress.Address2, 'EEDA8685');
+const withoutNationalAddress = orderApi.buildBulkOrder([sampleOrder({ shippingAddress: { ...sampleOrder().shippingAddress, address1: longAddress, address2: '' } })]).Orders[0].ShippingAddress;
+assert.equal(withoutNationalAddress.Address1, 'Al Yasmin, King Abdulaziz, Building 123, Apartment 456');
+assert.equal(withoutNationalAddress.Address2, '');
+assert.throws(
+  () => orderApi.buildBulkOrder([sampleOrder({ shippingAddress: { ...sampleOrder().shippingAddress, address1: 'A'.repeat(61) } })]),
+  /cannot be shortened/
+);
+assert.throws(
+  () => orderApi.buildBulkOrder([sampleOrder({ shippingAddress: { ...sampleOrder().shippingAddress, address2: 'A'.repeat(161) } })]),
+  /address2 exceeds 160 characters/
+);
 assert.throws(
   () => orderApi.buildBulkOrder([sampleOrder({ items: [{ itemId: 'bad-sku', quantity: 1 }] })]),
   /invalid FragranceX ItemId/

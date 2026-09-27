@@ -666,12 +666,14 @@ function mapOrderData(raw, aiResults){
   return raw.map((order) => {
     const ai = aiMap[order.orderId] || {};
     const extracted = extractFromAddress(order.address);
+    let address = { first: ai.address || '', second: ai.address2 || extracted.shortAddress || '' };
+    try { address = shippingAddressLines(address.first, address.second, order.orderId); } catch { /* Keep the original for manual review. */ }
     return {
       COrderID: order.orderId,
       FirstName: ai.firstName || '',
       LastName: ai.lastName || '',
-      Address: ai.address || '',
-      Address2: ai.address2 || extracted.shortAddress || '',
+      Address: address.first,
+      Address2: address.second,
       City: ai.city || order.city || '',
       State: resolveState(ai.state, ai.city, order.city),
       Zip: ai.zip || extracted.zipCode || '',
@@ -766,7 +768,11 @@ function costPreviewCells(row){
   ].join('');
 }
 function orderExecutionLabel(row){
-  if (!row.__fragrancexStatus) return 'لم يُرسل';
+  if (!row.__fragrancexStatus) {
+    try { shippingAddressLines(row.Address, row.Address2, row.COrderID); }
+    catch (error) { return error.message; }
+    return 'لم يُرسل';
+  }
   const total = Number(row.__fragrancexGrandTotalUSD) || 0;
   const totalText = total > 0 ? ` • $${total.toFixed(2)}` : '';
   if (row.__fragrancexStatus === 'success') return `تم التنفيذ${totalText}`;
@@ -791,7 +797,7 @@ function renderPreview(){
   const body = rows.map((row) => {
     const sourceIndex = outputRows.indexOf(row);
     const checked = selectedOrderKeys.has(row.__rowKey) ? 'checked' : '';
-    return `<tr><td class="row-select-cell"><input type="checkbox" ${checked} onchange="toggleOrderSelection(${jsArg(row.__rowKey)}, this.checked)"></td>${CSV_HEADERS.map((header) => `<td><input value="${escapeHtml(row[header])}" oninput="editCell(${sourceIndex}, '${header}', this.value)"></td>`).join('')}${costPreviewCells(row)}</tr>`;
+    return `<tr><td class="row-select-cell"><input type="checkbox" ${checked} onchange="toggleOrderSelection(${jsArg(row.__rowKey)}, this.checked)"></td>${CSV_HEADERS.map((header) => `<td><input value="${escapeHtml(row[header])}" oninput="editCell(${sourceIndex}, '${header}', this.value)"${header === 'Address' || header === 'Address2' ? ' onchange="renderPreview()"' : ''}></td>`).join('')}${costPreviewCells(row)}</tr>`;
   }).join('');
   $('tableWrap').innerHTML = `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
   updateSelectionUi(rows);
@@ -855,6 +861,23 @@ function updateSelectionUi(rows){
 function selectedRows(){
   return outputRows.filter((row) => selectedOrderKeys.has(row.__rowKey));
 }
+function shippingAddressLines(address1, address2, orderId){
+  const first = String(address1 ?? '').trim().replace(/\s+/g, ' ');
+  const second = String(address2 ?? '').trim().replace(/\s+/g, ' ');
+  if (!first) throw new Error(`طلب ${orderId}: العنوان ناقص`);
+  if (second.length > 160) throw new Error(`طلب ${orderId}: Address2 أطول من 160 حرفًا؛ ضع العنوان الوطني فقط`);
+  if (first.length <= 60) return { first, second };
+  const parts = first.split(/[,،]/).map((part) => part.trim()).filter(Boolean);
+  const compact = (part) => part.replace(/\s+(?:District|Neighborhood|Street|Road)$/i, '').trim();
+  const candidates = parts.length > 1
+    ? second
+      ? [`${parts[0]}, ${parts[1]}`, `${compact(parts[0])}, ${compact(parts[1])}`, compact(parts[1]), compact(parts[0])]
+      : [parts.map(compact).join(', ')]
+    : [compact(first)];
+  const concise = candidates.find((candidate) => candidate && candidate.length <= 60);
+  if (!concise) throw new Error(`طلب ${orderId}: لا يمكن اختصار Address1 إلى 60 حرفًا تلقائيًا؛ راجعه يدويًا`);
+  return { first: concise, second };
+}
 function validateOrderForPlacement(row){
   const required = [
     ['COrderID','رقم الطلب'],['FirstName','الاسم الأول'],['LastName','اسم العائلة'],
@@ -862,29 +885,33 @@ function validateOrderForPlacement(row){
   ];
   const missing = required.filter(([key]) => !String(row[key] || '').trim()).map(([,label]) => label);
   if (missing.length) return `طلب ${row.COrderID || 'بدون رقم'} ناقص: ${missing.join('، ')}`;
+  try { shippingAddressLines(row.Address, row.Address2, row.COrderID); } catch (error) { return error.message; }
   if (!Array.isArray(row.__supplierItems) || row.__supplierItems.length === 0) return `طلب ${row.COrderID}: لا يحتوي SKU صالحًا`;
   if (row.__supplierStatus !== 'ok') return `طلب ${row.COrderID}: لم يجتز فحص مخزون وتكلفة FragranceX`;
   if (Array.isArray(row.__supplierMissingSkus) && row.__supplierMissingSkus.length) return `طلب ${row.COrderID}: يحتوي SKU غير موجود لدى FragranceX`;
   return '';
 }
 function orderPlacementPayload(rows){
-  return rows.map((row) => ({
-    referenceId: String(row.COrderID),
-    shippingAddress: {
-      firstName: row.FirstName,
-      lastName: row.LastName,
-      address1: row.Address,
-      address2: row.Address2,
-      city: row.City,
-      state: row.State,
-      zipcode: row.Zip,
-      country: 'SA',
-      phone: row.Phone
-    },
-    items: row.__supplierItems.map((item) => ({ itemId: item.sku, quantity: item.quantity })),
-    isGiftWrapped: String(row.GiftWrap || '').trim().toLowerCase() === 'y',
-    giftWrapMessage: row.Message || ''
-  }));
+  return rows.map((row) => {
+    const address = shippingAddressLines(row.Address, row.Address2, row.COrderID);
+    return {
+      referenceId: String(row.COrderID),
+      shippingAddress: {
+        firstName: row.FirstName,
+        lastName: row.LastName,
+        address1: address.first,
+        address2: address.second,
+        city: row.City,
+        state: row.State,
+        zipcode: row.Zip,
+        country: 'SA',
+        phone: row.Phone
+      },
+      items: row.__supplierItems.map((item) => ({ itemId: item.sku, quantity: item.quantity })),
+      isGiftWrapped: String(row.GiftWrap || '').trim().toLowerCase() === 'y',
+      giftWrapMessage: row.Message || ''
+    };
+  });
 }
 function parseOrderPlacementError(status, text){
   let message = '';
@@ -976,12 +1003,18 @@ function escapeCSVField(value){
 }
 function csvText(){
   const lines = [CSV_HEADERS.join(',')];
-  for (const row of outputRows) lines.push(CSV_HEADERS.map((header) => escapeCSVField(row[header])).join(','));
+  for (const row of outputRows) {
+    const address = shippingAddressLines(row.Address, row.Address2, row.COrderID);
+    const prepared = { ...row, Address: address.first, Address2: address.second };
+    lines.push(CSV_HEADERS.map((header) => escapeCSVField(prepared[header])).join(','));
+  }
   return lines.join('\n');
 }
 function downloadCSV(){
   if (outputRows.length === 0) return;
-  const blob = new Blob([csvText()], { type: 'text/csv;charset=utf-8;' });
+  let content;
+  try { content = csvText(); } catch (error) { log(error.message); return; }
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -991,7 +1024,9 @@ function downloadCSV(){
 }
 async function copyCSV(){
   if (outputRows.length === 0) return;
-  await navigator.clipboard.writeText(csvText());
+  let content;
+  try { content = csvText(); } catch (error) { log(error.message); return; }
+  await navigator.clipboard.writeText(content);
   log('تم نسخ CSV إلى الحافظة.');
 }
 function clearResults(){

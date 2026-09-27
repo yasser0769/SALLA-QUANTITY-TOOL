@@ -35,7 +35,7 @@ Return ONLY a JSON array with one object per order in this exact format:
     "orderId": "...",
     "firstName": "...",
     "lastName": "...",
-    "address": "... District, ... Street",
+    "address": "Neighborhood, Street (maximum 60 characters)",
     "address2": "XXXX0000",
     "city": "...",
     "state": "...",
@@ -44,7 +44,8 @@ Return ONLY a JSON array with one object per order in this exact format:
 ]
 
 Important rules:
-- For address, format as: "[Neighborhood English] District, [Street English] Street".
+- Keep address within 60 characters. Include the neighborhood and street when available; omit generic words such as District and Street or secondary details to fit. Never cut a name in the middle of a word.
+- Address2 is only the Saudi national short address code (for example GNMA6281). If it is unavailable, return an empty string. Never move address overflow into Address2.
 - If neighborhood or street is missing, omit that part.
 - City should be in English.
 - State must be EXACTLY one of these values only:

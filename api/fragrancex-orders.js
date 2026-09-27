@@ -2,6 +2,7 @@ const TOKEN_ENDPOINT = 'https://apilisting.fragrancex.com/token';
 const PLACE_BULK_ORDER_ENDPOINT = 'https://apiordering.fragrancex.com/order/PlaceBulkOrder/';
 const INTERNATIONAL_STANDARD_SHIPPING = 3;
 const MAX_ORDERS_PER_BATCH = 100;
+const MAX_ADDRESS_LINE_LENGTH = 60;
 
 let inMemoryToken = null;
 
@@ -37,6 +38,28 @@ function optionalString(value, maxLength = 160) {
   return String(value ?? '').trim().slice(0, maxLength);
 }
 
+function shippingAddressLines(address1, address2, index) {
+  const first = String(address1 ?? '').trim().replace(/\s+/g, ' ');
+  const second = String(address2 ?? '').trim().replace(/\s+/g, ' ');
+  const field = `orders[${index}].shippingAddress`;
+  if (!first) throw new Error(`${field}.address1 is required`);
+  if (second.length > 160) {
+    throw new Error(`${field}.address2 exceeds 160 characters; keep only the national address`);
+  }
+  if (first.length <= MAX_ADDRESS_LINE_LENGTH) return { first, second };
+
+  const parts = first.split(/[,،]/).map(part => part.trim()).filter(Boolean);
+  const compact = part => part.replace(/\s+(?:District|Neighborhood|Street|Road)$/i, '').trim();
+  const candidates = parts.length > 1
+    ? second
+      ? [`${parts[0]}, ${parts[1]}`, `${compact(parts[0])}, ${compact(parts[1])}`, compact(parts[1]), compact(parts[0])]
+      : [parts.map(compact).join(', ')]
+    : [compact(first)];
+  const concise = candidates.find(candidate => candidate && candidate.length <= MAX_ADDRESS_LINE_LENGTH);
+  if (!concise) throw new Error(`${field}.address1 cannot be shortened to 60 characters; review it manually`);
+  return { first: concise, second };
+}
+
 function normalizeOrderItem(item, orderIndex) {
   const itemId = String(item?.itemId ?? item?.sku ?? '').replace(/[^\d]/g, '').trim();
   const quantity = Number.parseInt(item?.quantity, 10);
@@ -56,13 +79,14 @@ function normalizeOrder(order, index) {
 
   const items = Array.isArray(order?.items) ? order.items : [];
   if (!items.length) throw new Error(`orders[${index}].items is required`);
+  const address = shippingAddressLines(order.shippingAddress.address1, order.shippingAddress.address2, index);
 
   return {
     ShippingAddress: {
       FirstName: requiredString(order.shippingAddress.firstName, `orders[${index}].shippingAddress.firstName`, 80),
       LastName: requiredString(order.shippingAddress.lastName, `orders[${index}].shippingAddress.lastName`, 80),
-      Address1: requiredString(order.shippingAddress.address1, `orders[${index}].shippingAddress.address1`, 160),
-      Address2: optionalString(order.shippingAddress.address2, 160),
+      Address1: address.first,
+      Address2: address.second,
       City: requiredString(order.shippingAddress.city, `orders[${index}].shippingAddress.city`, 80),
       State: requiredString(order.shippingAddress.state, `orders[${index}].shippingAddress.state`, 80),
       Zipcode: requiredString(order.shippingAddress.zipcode, `orders[${index}].shippingAddress.zipcode`, 20),
