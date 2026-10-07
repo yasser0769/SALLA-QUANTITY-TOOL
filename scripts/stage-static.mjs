@@ -24,9 +24,12 @@ for (const [source, target] of htmlFiles) {
 await cp(join(root, "assets"), join(publicDir, "assets"), { recursive: true });
 await cp(join(root, "assets", "og.png"), join(publicDir, "og.png"));
 
-for (const name of ["prepare-orders", "translate-description", "check-description", "fragrancex-orders"]) {
+for (const name of ["prepare-orders", "translate-description", "check-description"]) {
   await cp(join(root, "api", `${name}.js`), join(legacyDir, `${name}.cjs`));
 }
+const ordersSource = (await readFile(join(root, "api", "fragrancex-orders.js"), "utf8"))
+  .replace("require('../data/fragrancex-reconciled-orders.json')", "require('../../data/fragrancex-reconciled-orders.json')");
+await writeFile(join(legacyDir, "fragrancex-orders.cjs"), ordersSource);
 
 let costsSource = await readFile(join(root, "api", "fragrancex-costs.js"), "utf8");
 costsSource = costsSource

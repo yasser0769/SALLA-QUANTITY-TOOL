@@ -1,0 +1,22 @@
+{
+  "292246033": {
+    "referenceId": "292246033",
+    "orderId": "75062344",
+    "orderIds": ["75062344", "75062488"],
+    "status": "duplicate",
+    "resultCode": 1,
+    "message": "مراجعة 7 أكتوبر: طلبان مشحونان لنفس المرجع؛ يمنع إعادة الإرسال.",
+    "source": "supplier-account-audit-2026-10-07"
+  },
+  "292208856": {
+    "referenceId": "292208856",
+    "orderId": "",
+    "status": "review_required",
+    "resultCode": null,
+    "message": "مراجعة 7 أكتوبر: غير موجود في دفعة المورد أو البحث بالمرجع؛ يحتاج مراجعة قبل أي إعادة إرسال.",
+    "source": "supplier-account-audit-2026-10-07"
+  },
+  "292243839": { "referenceId": "292243839", "orderId": "75062341", "status": "success", "resultCode": 1, "source": "supplier-account-audit-2026-10-07" },
+  "292231678": { "referenceId": "292231678", "orderId": "75062338", "status": "success", "resultCode": 1, "source": "supplier-account-audit-2026-10-07" },
+  "292187921": { "referenceId": "292187921", "orderId": "75062335", "status": "success", "resultCode": 1, "source": "supplier-account-audit-2026-10-07" }
+}

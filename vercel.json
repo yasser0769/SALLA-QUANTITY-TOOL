@@ -15,7 +15,8 @@
     },
     {
       "src": "api/fragrancex-orders.js",
-      "use": "@vercel/node"
+      "use": "@vercel/node",
+      "config": { "includeFiles": ["data/fragrancex-reconciled-orders.json"], "maxDuration": 60 }
     },
     {
       "src": "api/translate-description.js",

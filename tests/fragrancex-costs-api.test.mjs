@@ -63,8 +63,8 @@ try {
         ok: true,
         json: async () => ({
           ListProduct: [
-            { ItemId: '111111', WholesalePriceUSD: 10 },
-            { ItemId: '222222', WholesalePriceUSD: '5.50' }
+            { ItemId: '111111', WholesalePriceUSD: 10, Instock: false },
+            { ItemId: '222222', WholesalePriceUSD: '5.50', Instock: true }
           ]
         })
       };
@@ -104,6 +104,8 @@ try {
   assert.equal(body.results[1].productCostUSD, 11);
   assert.equal(body.results[1].landedCostSAR, 122.44);
   assert.equal(body.results[1].profitSAR, -22.44);
+  assert.equal(body.results[1].status, 'ok');
+  assert.deepEqual(body.results[0].outOfStockSkus, [{ sku: '111111', quantity: 2 }]);
   assert.equal(body.totals.missingSkuCount, 1);
   assert.ok(calls.some(call => call.url === 'https://apilisting.fragrancex.com/token'), 'token endpoint must be mocked and called');
   assert.equal(calls.filter(call => call.url === 'https://redis.example' && JSON.parse(call.options.body)[0] === 'SET').length, 3);

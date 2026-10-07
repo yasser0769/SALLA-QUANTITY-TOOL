@@ -79,6 +79,8 @@ try {
   process.env.FRAGRANCEX_API_ID = 'test-id';
   process.env.FRAGRANCEX_API_KEY = 'test-key';
   process.env.TRANSLATION_ACCESS_TOKEN = 'shared-secret';
+  process.env.UPSTASH_REDIS_REST_URL = 'https://redis.example';
+  process.env.UPSTASH_REDIS_REST_TOKEN = 'redis-token';
 
   const unauthorized = responseMock();
   await orderApi(requestMock({ orders: [sampleOrder()] }, { 'x-translation-access-token': 'wrong' }), unauthorized);
@@ -87,6 +89,9 @@ try {
   const calls = [];
   global.fetch = async (url, options = {}) => {
     calls.push({ url: String(url), options });
+    if (String(url) === 'https://redis.example') return { ok: true, json: async () => ({ result: 'OK' }) };
+    if (String(url).startsWith('https://apitracking.fragrancex.com/')) return { ok: false, status: 404 };
+    if (String(url) === 'https://apilisting.fragrancex.com/product/get/567086') return { ok: true, json: async () => ({ ItemId: '567086', Instock: true }) };
     if (String(url) === 'https://apilisting.fragrancex.com/token') {
       assert.equal(options.method, 'POST');
       assert.match(String(options.body), /grant_type=apiAccessKey/);
@@ -126,7 +131,7 @@ try {
 
   const response = responseMock();
   await orderApi(
-    requestMock({ orders: [sampleOrder()] }, { 'x-translation-access-token': 'shared-secret' }),
+    requestMock({ attemptId: 'test-attempt-00000001', orders: [sampleOrder()] }, { 'x-translation-access-token': 'shared-secret' }),
     response
   );
   assert.equal(response.statusCode, 200);
@@ -144,7 +149,7 @@ try {
     subTotalUSD: 30,
     shippingChargeUSD: 12.5
   });
-  assert.equal(calls.length, 2);
+  assert.equal(calls.filter(call => call.url.includes('PlaceBulkOrder')).length, 1);
 } finally {
   global.fetch = oldFetch;
   process.env = oldEnv;

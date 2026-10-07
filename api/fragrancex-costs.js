@@ -71,8 +71,8 @@ function configuredUsdToSarRate() {
 }
 
 function redisConfig() {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
   if (!url || !token) return null;
   return { url, token };
 }
@@ -184,7 +184,7 @@ function normalizeProductCatalog(products) {
     if (!sku || bySku[sku]) continue;
     const wholesalePriceUSD = numberValue(product.WholesalePriceUSD ?? product.wholesalePriceUSD ?? product.WholesalePrice ?? product.Cost);
     if (wholesalePriceUSD > 0) {
-      bySku[sku] = { wholesalePriceUSD: roundMoney(wholesalePriceUSD) };
+      bySku[sku] = { wholesalePriceUSD: roundMoney(wholesalePriceUSD), inStock: typeof product.Instock === 'boolean' ? product.Instock : null };
     }
   }
   return bySku;
@@ -235,7 +235,7 @@ async function loadCostData() {
     tokenPromise ||= fragrancexToken();
     return tokenPromise;
   };
-  const catalog = await cachedDataset('catalog', async () => {
+  const catalog = await cachedDataset('catalog-stock-v2', async () => {
     const token = await getToken();
     const data = await fragrancexGet(PRODUCT_LIST_ENDPOINT, token);
     return normalizeProductCatalog(extractArray(data, ['ListProduct', 'Products', 'Product', 'products', 'items']));
@@ -325,6 +325,8 @@ function calculateOrderCosts({ orders, catalog, shippingRows, vatRows, countryCo
   const results = orders.map(order => {
     const items = normalizeOrderItems(order.items);
     const missingSkus = [];
+    const outOfStockSkus = [];
+    const stockUnknownSkus = [];
     let productCostUSD = 0;
     for (const item of items) {
       const product = catalog[item.sku];
@@ -333,6 +335,8 @@ function calculateOrderCosts({ orders, catalog, shippingRows, vatRows, countryCo
         continue;
       }
       productCostUSD += item.quantity * product.wholesalePriceUSD;
+      if (product.inStock === false) outOfStockSkus.push({ sku: item.sku, quantity: item.quantity });
+      else if (product.inStock !== true) stockUnknownSkus.push({ sku: item.sku, quantity: item.quantity });
     }
     productCostUSD = roundMoney(productCostUSD);
     const shippingEstimate = estimateSaudiShippingUSD(items, weightsBySku);
@@ -348,6 +352,8 @@ function calculateOrderCosts({ orders, catalog, shippingRows, vatRows, countryCo
       orderId: String(order.orderId || ''),
       items,
       missingSkus,
+      outOfStockSkus,
+      stockUnknownSkus,
       missingWeightSkus: shippingEstimate.missingWeightSkus,
       productCostUSD,
       shippingCostUSD,
@@ -361,7 +367,7 @@ function calculateOrderCosts({ orders, catalog, shippingRows, vatRows, countryCo
       vatCostSAR: roundMoney(vatCostUSD * usdToSarRate),
       landedCostSAR,
       profitSAR: roundMoney(orderValueSAR - landedCostSAR),
-      status: missingSkus.length ? 'missing_skus' : productCostUSD > 0 ? 'ok' : 'no_matched_items'
+      status: missingSkus.length ? 'missing_skus' : outOfStockSkus.length ? 'out_of_stock' : stockUnknownSkus.length ? 'stock_unknown' : productCostUSD > 0 ? 'ok' : 'no_matched_items'
     };
   });
 
@@ -392,8 +398,8 @@ async function handler(request, response) {
     return sendJson(response, 200, {
       ok: true,
       fragrancexConfigured: Boolean(process.env.FRAGRANCEX_API_ID && process.env.FRAGRANCEX_API_KEY),
-      redisConfigured: Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN),
-      cacheMode: process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN ? 'upstash' : 'memory',
+      redisConfigured: Boolean(redisConfig()),
+      cacheMode: redisConfig() ? 'upstash' : 'memory',
       accessTokenConfigured: Boolean(process.env.TRANSLATION_ACCESS_TOKEN),
       skuWeightsConfigured: Object.keys(loadSkuWeights()).length,
       usdToSarRate: configuredUsdToSarRate()
@@ -439,7 +445,7 @@ async function handler(request, response) {
         catalog: costData.catalog.cacheHit,
         shipping: costData.shipping.cacheHit,
         vat: costData.vat.cacheHit,
-        mode: process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN ? 'upstash' : 'memory'
+        mode: redisConfig() ? 'upstash' : 'memory'
       }
     });
   } catch (error) {

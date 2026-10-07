@@ -179,6 +179,7 @@ td input:focus{border-color:rgba(15,118,110,.45);background:#fff;box-shadow:0 0 
     <div class="preview-tools">
       <input class="search" id="previewSearch" type="search" placeholder="بحث في رقم الطلب، الاسم، المدينة، الجوال، أو SKU..." oninput="renderPreview()">
       <button class="btn order-action" id="placeSelectedBtn" onclick="placeSelectedOrders()" disabled>تنفيذ المحدد على FragranceX</button>
+      <button class="btn" id="refreshHistoryBtn" onclick="refreshOrderHistory()">تحديث ربط المورد</button>
       <button class="btn" onclick="downloadCSV()">تحميل CSV</button>
       <button class="btn" onclick="copyCSV()">نسخ CSV</button>
       <button class="btn" id="deleteSelectedBtn" onclick="deleteSelectedOrders()" disabled>حذف المحدد</button>
@@ -217,6 +218,47 @@ let selectedOrderKeys = new Set();
 let supplierCostMeta = null;
 let processing = false;
 let placingOrders = false;
+let historyReady = false;
+const ORDER_HISTORY_KEY = 'fragrancex-order-history-v1';
+const BLOCKED_ORDER_STATUSES = new Set(['pending','unknown','success','warning','duplicate','review_required']);
+
+function readOrderHistory(){
+  try { return JSON.parse(localStorage.getItem(ORDER_HISTORY_KEY) || '{}'); } catch { return {}; }
+}
+function persistOrderHistory(){
+  const saved = readOrderHistory();
+  for (const row of outputRows) {
+    if (!row.__fragrancexStatus || row.__fragrancexStatus === 'not_sent') continue;
+    saved[row.COrderID] = {
+      referenceId: String(row.COrderID), orderId: row.__fragrancexOrderId || '',
+      orderIds: row.__fragrancexOrderIds || [], resultCode: row.__fragrancexResultCode,
+      status: row.__fragrancexStatus, message: row.__fragrancexMessage || '', grandTotalUSD: row.__fragrancexGrandTotalUSD || 0
+    };
+  }
+  try { localStorage.setItem(ORDER_HISTORY_KEY, JSON.stringify(saved)); } catch { /* Server ledger remains authoritative. */ }
+}
+async function refreshOrderHistory(){
+  if (placingOrders || !outputRows.length) return;
+  historyReady = false;
+  applyOrderPlacementResults(Object.values(readOrderHistory()));
+  try {
+    const accessToken = $('accessToken').value.trim();
+    const ids = outputRows.map(row => String(row.COrderID));
+    if (new Set(ids).size !== ids.length) throw new Error('الملف يحتوي أرقام طلبات مكررة؛ صحح الملف قبل التنفيذ.');
+    for (let start = 0; start < ids.length; start += 25) {
+      const response = await fetch('/api/fragrancex-orders', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Translation-Access-Token': accessToken },
+        body: JSON.stringify({ operation: 'reconcile', references: ids.slice(start, start + 25) })
+      });
+      const data = await response.json();
+      if (!response.ok || !Array.isArray(data.results)) throw new Error(data.error || 'تعذر قراءة سجل التنفيذ.');
+      applyOrderPlacementResults(data.results);
+    }
+    historyReady = true;
+    log('تمت مطابقة سجل التنفيذ؛ الطلبات المنفذة أو غير المؤكدة محمية من إعادة الإرسال.');
+  } catch (error) { log(`توقف التنفيذ لحماية الطلبات: ${error.message}`); }
+  renderPreview();
+}
 
 function $(id){return document.getElementById(id)}
 function log(message){
@@ -267,9 +309,12 @@ function checkReady(){
   const deleteButton = $('deleteSelectedBtn');
   if (deleteButton) deleteButton.disabled = placingOrders || selectedOrderKeys.size === 0;
   const placeButton = $('placeSelectedBtn');
-  if (placeButton) placeButton.disabled = placingOrders || selectedOrderKeys.size === 0;
+  if (placeButton) placeButton.disabled = processing || placingOrders || !historyReady || selectedOrderKeys.size === 0 || selectedRows().some(row => BLOCKED_ORDER_STATUSES.has(row.__fragrancexStatus));
+  const historyButton = $('refreshHistoryBtn');
+  if (historyButton) historyButton.disabled = processing || placingOrders || !outputRows.length;
 }
 function loadOrderFile(event){
+  if (placingOrders || processing) return;
   const file = event.target.files?.[0];
   if (!file) return;
   orderFile = file;
@@ -481,6 +526,8 @@ function applySupplierCosts(results){
     row.__supplierShippingEstimated = Boolean(cost.shippingEstimated);
     row.__supplierShippingWeightGrams = Number(cost.shippingWeightGrams) || 0;
     row.__supplierMissingSkus = Array.isArray(cost.missingSkus) ? cost.missingSkus : [];
+    row.__supplierOutOfStockSkus = Array.isArray(cost.outOfStockSkus) ? cost.outOfStockSkus : [];
+    row.__supplierStockUnknownSkus = Array.isArray(cost.stockUnknownSkus) ? cost.stockUnknownSkus : [];
     row.__supplierMissingWeightSkus = Array.isArray(cost.missingWeightSkus) ? cost.missingWeightSkus : [];
     row.__supplierStatus = cost.status || '';
     row.__supplierError = '';
@@ -537,6 +584,7 @@ async function processOrders(){
     return;
   }
   processing = true;
+  historyReady = false;
   outputRows = [];
   supplierCostMeta = null;
   checkReady();
@@ -561,6 +609,7 @@ async function processOrders(){
       setProgress(10 + Math.round((Math.min(start + batchSize, rawOrders.length) / rawOrders.length) * 80));
     }
     outputRows = withRowKeys(mapOrderData(rawOrders, aiResults));
+    await refreshOrderHistory();
     try {
       log('حساب تكلفة المورد من FragranceX...');
       const costData = await fetchSupplierCosts(outputRows, accessToken);
@@ -617,11 +666,12 @@ function parseOrderDetails(products){
 function parseOrderItems(products){
   if (!products) return [];
   const matches = [...String(products).matchAll(/\(SKU:\s*([^)]+?)\).*?\(Qty:\s*(\d+)\)/g)];
+  if (matches.length !== (String(products).match(/\(SKU:/g) || []).length) throw new Error('بعض منتجات الطلب لا تحتوي كمية صالحة؛ راجع الملف.');
   const bySku = new Map();
   for (const match of matches) {
-    const sku = String(match[1] || '').replace(/[^\d]/g, '').trim();
+    const sku = String(match[1] || '').trim();
     const quantity = Math.max(0, Number.parseInt(match[2], 10) || 0);
-    if (!sku || quantity <= 0) continue;
+    if (!/^\d{6}$/.test(sku) || quantity <= 0) throw new Error(`SKU أو كمية غير صالحة: ${match[1]}`);
     bySku.set(sku, (bySku.get(sku) || 0) + quantity);
   }
   return [...bySku.entries()].map(([sku, quantity]) => ({ sku, quantity }));
@@ -693,6 +743,8 @@ function mapOrderData(raw, aiResults){
       __supplierShippingEstimated: false,
       __supplierShippingWeightGrams: 0,
       __supplierMissingSkus: [],
+      __supplierOutOfStockSkus: [],
+      __supplierStockUnknownSkus: [],
       __supplierMissingWeightSkus: [],
       __supplierStatus: '',
       __supplierError: '',
@@ -743,6 +795,8 @@ function costStatusLabel(row){
   if (row.__supplierStatus === 'error') {
     return row.__supplierError || 'تعذر حساب تكلفة المورد';
   }
+  if (row.__supplierOutOfStockSkus?.length) return `غير متوفر: ${row.__supplierOutOfStockSkus.map(item => item.sku).join(', ')}`;
+  if (row.__supplierStockUnknownSkus?.length) return 'سعر موجود، التوافر غير مؤكد';
   if (missingSkus.length) {
     return `SKU ناقص: ${missingSkus.map((item) => `${item.sku}×${item.quantity}`).join(', ')}`;
   }
@@ -775,6 +829,9 @@ function orderExecutionLabel(row){
   }
   const total = Number(row.__fragrancexGrandTotalUSD) || 0;
   const totalText = total > 0 ? ` • $${total.toFixed(2)}` : '';
+  if (row.__fragrancexStatus === 'not_sent') return 'لم يُرسل';
+  if (['pending','unknown','review_required'].includes(row.__fragrancexStatus)) return row.__fragrancexMessage || 'بانتظار التحقق؛ يمنع إعادة الإرسال';
+  if (row.__fragrancexStatus === 'duplicate') return `مكرر لدى المورد: ${(row.__fragrancexOrderIds || []).join('، ')}؛ يمنع إعادة الإرسال`;
   if (row.__fragrancexStatus === 'success') return `تم التنفيذ${totalText}`;
   if (row.__fragrancexStatus === 'warning') return `تم مع تنبيه${totalText}${row.__fragrancexMessage ? `: ${row.__fragrancexMessage}` : ''}`;
   return row.__fragrancexMessage || 'رفض FragranceX الطلب';
@@ -797,16 +854,23 @@ function renderPreview(){
   const body = rows.map((row) => {
     const sourceIndex = outputRows.indexOf(row);
     const checked = selectedOrderKeys.has(row.__rowKey) ? 'checked' : '';
-    return `<tr><td class="row-select-cell"><input type="checkbox" ${checked} onchange="toggleOrderSelection(${jsArg(row.__rowKey)}, this.checked)"></td>${CSV_HEADERS.map((header) => `<td><input value="${escapeHtml(row[header])}" oninput="editCell(${sourceIndex}, '${header}', this.value)"${header === 'Address' || header === 'Address2' ? ' onchange="renderPreview()"' : ''}></td>`).join('')}${costPreviewCells(row)}</tr>`;
+    return `<tr><td class="row-select-cell"><input type="checkbox" ${checked} ${placingOrders ? 'disabled' : ''} onchange="toggleOrderSelection(${jsArg(row.__rowKey)}, this.checked)"></td>${CSV_HEADERS.map((header) => `<td><input value="${escapeHtml(row[header])}" ${header === 'COrderID' ? 'readonly' : ''} ${placingOrders ? 'disabled' : ''} oninput="editCell(${sourceIndex}, '${header}', this.value)"${header === 'Address' || header === 'Address2' ? ' onchange="renderPreview()"' : ''}></td>`).join('')}${costPreviewCells(row)}</tr>`;
   }).join('');
   $('tableWrap').innerHTML = `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
   updateSelectionUi(rows);
 }
 function editCell(index, key, value){
+  if (placingOrders || key === 'COrderID') return;
   if (!outputRows[index]) return;
   outputRows[index][key] = value;
   if (key === 'OrderDetails') {
-    outputRows[index].__supplierItems = parsePreparedOrderItems(value);
+    try { outputRows[index].__supplierItems = parsePreparedOrderItems(value); }
+    catch (error) {
+      outputRows[index].__supplierItems = [];
+      outputRows[index].__supplierStatus = 'error';
+      outputRows[index].__supplierError = error.message;
+      return;
+    }
     outputRows[index].__supplierStatus = '';
     outputRows[index].__supplierMissingSkus = [];
   }
@@ -815,19 +879,22 @@ function parsePreparedOrderItems(value){
   const bySku = new Map();
   for (const part of String(value || '').split('|')) {
     const [quantityValue, skuValue] = part.split(',').map((item) => String(item || '').trim());
-    const sku = String(skuValue || '').replace(/[^\d]/g, '');
-    const quantity = Number.parseInt(quantityValue, 10);
-    if (!sku || !Number.isInteger(quantity) || quantity < 1) continue;
+    const sku = String(skuValue || '').trim();
+    const quantity = Number(quantityValue);
+    if (!part.trim()) continue;
+    if (!/^\d{6}$/.test(sku) || !Number.isInteger(quantity) || quantity < 1) throw new Error('تفاصيل المنتجات تحتوي SKU أو كمية غير صالحة.');
     bySku.set(sku, (bySku.get(sku) || 0) + quantity);
   }
   return [...bySku.entries()].map(([sku, quantity]) => ({ sku, quantity }));
 }
 function toggleOrderSelection(rowKey, checked){
+  if (placingOrders || processing) return;
   if (checked) selectedOrderKeys.add(rowKey);
   else selectedOrderKeys.delete(rowKey);
   renderPreview();
 }
 function toggleVisibleSelection(checked){
+  if (placingOrders || processing) return;
   for (const row of filteredRows()) {
     if (checked) selectedOrderKeys.add(row.__rowKey);
     else selectedOrderKeys.delete(row.__rowKey);
@@ -844,12 +911,12 @@ function updateSelectionUi(rows){
   }
   const deleteButton = $('deleteSelectedBtn');
   if (deleteButton) {
-    deleteButton.disabled = selectedOrderKeys.size === 0;
+    deleteButton.disabled = processing || placingOrders || selectedOrderKeys.size === 0;
     deleteButton.textContent = selectedOrderKeys.size ? `حذف المحدد (${selectedOrderKeys.size})` : 'حذف المحدد';
   }
   const placeButton = $('placeSelectedBtn');
   if (placeButton) {
-    placeButton.disabled = placingOrders || selectedOrderKeys.size === 0;
+    placeButton.disabled = processing || placingOrders || !historyReady || selectedOrderKeys.size === 0 || selectedRows().some(row => BLOCKED_ORDER_STATUSES.has(row.__fragrancexStatus));
     placeButton.textContent = placingOrders
       ? 'جارٍ التنفيذ...'
       : selectedOrderKeys.size
@@ -879,6 +946,7 @@ function shippingAddressLines(address1, address2, orderId){
   return { first: concise, second };
 }
 function validateOrderForPlacement(row){
+  if (BLOCKED_ORDER_STATUSES.has(row.__fragrancexStatus)) return `طلب ${row.COrderID}: منفذ سابقًا أو يحتاج مراجعة؛ يمنع إعادة الإرسال.`;
   const required = [
     ['COrderID','رقم الطلب'],['FirstName','الاسم الأول'],['LastName','اسم العائلة'],
     ['Address','العنوان'],['City','المدينة'],['State','المنطقة'],['Zip','الرمز البريدي'],['Phone','الجوال']
@@ -887,6 +955,11 @@ function validateOrderForPlacement(row){
   if (missing.length) return `طلب ${row.COrderID || 'بدون رقم'} ناقص: ${missing.join('، ')}`;
   try { shippingAddressLines(row.Address, row.Address2, row.COrderID); } catch (error) { return error.message; }
   if (!Array.isArray(row.__supplierItems) || row.__supplierItems.length === 0) return `طلب ${row.COrderID}: لا يحتوي SKU صالحًا`;
+  if (row.OrderDetails) {
+    try {
+      if (JSON.stringify(parsePreparedOrderItems(row.OrderDetails)) !== JSON.stringify(row.__supplierItems)) return `طلب ${row.COrderID}: تفاصيل المنتجات غير متطابقة؛ راجعها.`;
+    } catch (error) { return error.message; }
+  }
   if (row.__supplierStatus !== 'ok') return `طلب ${row.COrderID}: لم يجتز فحص مخزون وتكلفة FragranceX`;
   if (Array.isArray(row.__supplierMissingSkus) && row.__supplierMissingSkus.length) return `طلب ${row.COrderID}: يحتوي SKU غير موجود لدى FragranceX`;
   return '';
@@ -927,21 +1000,25 @@ function applyOrderPlacementResults(results){
     const result = byReferenceId.get(String(row.COrderID));
     if (!result) continue;
     row.__fragrancexOrderId = result.orderId || '';
-    row.__fragrancexResultCode = Number(result.resultCode);
+    row.__fragrancexOrderIds = result.orderIds || [];
+    row.__fragrancexResultCode = result.resultCode == null ? null : Number(result.resultCode);
     row.__fragrancexStatus = result.status || 'failed';
     row.__fragrancexMessage = result.message || '';
     row.__fragrancexGrandTotalUSD = Number(result.grandTotalUSD) || 0;
-    if (result.status === 'success' || result.status === 'warning') selectedOrderKeys.delete(row.__rowKey);
+    if (BLOCKED_ORDER_STATUSES.has(result.status)) selectedOrderKeys.delete(row.__rowKey);
   }
+  persistOrderHistory();
 }
 async function placeSelectedOrders(){
-  if (placingOrders || selectedOrderKeys.size === 0) return;
+  if (placingOrders || processing || selectedOrderKeys.size === 0 || !historyReady) return;
   const accessToken = $('accessToken').value.trim();
   if (!accessToken) {
     log('أدخل رمز الدخول أولًا.');
     return;
   }
   placingOrders = true;
+  let submittedRows = [];
+  let dispatchStarted = false;
   checkReady();
   renderPreview();
   try {
@@ -957,6 +1034,11 @@ async function placeSelectedOrders(){
       log('تم إلغاء التنفيذ قبل إرسال أي طلب إلى FragranceX.');
       return;
     }
+    const payloadOrders = orderPlacementPayload(rows);
+    submittedRows = rows;
+    dispatchStarted = true;
+    for (const row of rows) { row.__fragrancexStatus = 'pending'; row.__fragrancexMessage = 'جارٍ التنفيذ؛ يمنع إعادة الإرسال.'; }
+    persistOrderHistory();
     log(`إرسال ${rows.length} طلب إلى FragranceX...`);
     const response = await fetch('/api/fragrancex-orders', {
       method: 'POST',
@@ -964,15 +1046,22 @@ async function placeSelectedOrders(){
         'Content-Type': 'application/json',
         'X-Translation-Access-Token': accessToken
       },
-      body: JSON.stringify({ orders: orderPlacementPayload(rows) })
+      body: JSON.stringify({ attemptId: crypto.randomUUID(), orders: payloadOrders })
     });
-    if (!response.ok) throw new Error(parseOrderPlacementError(response.status, await response.text()));
     const data = await response.json();
+    if (Array.isArray(data.results)) applyOrderPlacementResults(data.results);
+    if (!response.ok) throw new Error(parseOrderPlacementError(response.status, JSON.stringify(data)));
+    if (!Array.isArray(data.results) || data.results.length !== rows.length) throw new Error('رد المورد غير مكتمل؛ حدّث الربط قبل إعادة الإرسال.');
     applyOrderPlacementResults(data.results);
-    const successful = data.results.filter((item) => item.status === 'success' || item.status === 'warning').length;
-    const failed = data.results.length - successful;
-    log(`اكتمل رد FragranceX: نجح ${successful}، فشل ${failed}${data.bulkOrderId ? `، رقم الدفعة ${data.bulkOrderId}` : ''}.`);
+    const count = status => data.results.filter(item => item.status === status).length;
+    log(`رد FragranceX: مؤكد ${count('success')}، تحذير ${count('warning')}، مرفوض ${count('failed')}، غير مؤكد ${count('unknown')}${data.bulkOrderId ? `، رقم الدفعة ${data.bulkOrderId}` : ''}.`);
   } catch (error) {
+    if (dispatchStarted) {
+      for (const row of submittedRows) if (row.__fragrancexStatus === 'pending') {
+        row.__fragrancexStatus = 'unknown'; row.__fragrancexMessage = 'نتيجة غير مؤكدة؛ حدّث ربط المورد قبل إعادة الإرسال.';
+      }
+      persistOrderHistory();
+    }
     log(`خطأ تنفيذ FragranceX: ${error.message}`);
   } finally {
     placingOrders = false;
@@ -981,6 +1070,7 @@ async function placeSelectedOrders(){
   }
 }
 function deleteSelectedOrders(){
+  if (placingOrders || processing) return;
   if (selectedOrderKeys.size === 0) return;
   const count = selectedOrderKeys.size;
   if (!confirm(`حذف ${count} طلب من جدول التجهيز؟`)) return;
@@ -1002,6 +1092,8 @@ function escapeCSVField(value){
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g,'""')}"` : text;
 }
 function csvText(){
+  const blocked = outputRows.find(row => BLOCKED_ORDER_STATUSES.has(row.__fragrancexStatus));
+  if (blocked) throw new Error(`طلب ${blocked.COrderID}: منفذ أو يحتاج مراجعة؛ استبعده من التصدير لمنع تكراره.`);
   const lines = [CSV_HEADERS.join(',')];
   for (const row of outputRows) {
     const address = shippingAddressLines(row.Address, row.Address2, row.COrderID);
@@ -1030,6 +1122,8 @@ async function copyCSV(){
   log('تم نسخ CSV إلى الحافظة.');
 }
 function clearResults(){
+  if (placingOrders || processing) return;
+  historyReady = false;
   rawOrders = [];
   outputRows = [];
   selectedOrderKeys.clear();
