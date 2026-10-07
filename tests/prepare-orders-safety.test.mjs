@@ -43,15 +43,30 @@ test('a charged request with response loss becomes unknown and cannot be sent tw
   assert.equal(calls,1);
 });
 
-test('reimport restores server history and blocks both execution and CSV export',async()=>{
+test('reimport restores server history and blocks execution while allowing CSV export',async()=>{
   const {ctx,get}=context();
   ctx.fetch=async()=>({ok:true,json:async()=>({results:[{referenceId:'100001',orderId:'75062344',orderIds:['75062344','75062488'],status:'duplicate',resultCode:1}]})});
   await vm.runInContext('refreshOrderHistory()',ctx);
   assert.equal(ctx.fixture.__fragrancexStatus,'duplicate');
   vm.runInContext('selectedOrderKeys.add(fixture.__rowKey); checkReady()',ctx);
   assert.equal(get('placeSelectedBtn').disabled,true);
-  assert.throws(()=>vm.runInContext('csvText()',ctx),/منفذ أو يحتاج مراجعة/);
+  const csv=vm.runInContext('csvText()',ctx);
+  assert.match(csv,/100001/);
+  assert.match(csv,/"2,542940\|"/);
+  assert.equal(csv.split('\n').length,2);
+  assert.equal(ctx.fixture.__fragrancexStatus,'duplicate');
   assert.match(vm.runInContext('orderExecutionLabel(fixture)',ctx),/75062488/);
+});
+
+test('CSV includes every prepared row regardless of execution state without altering purchase protection',()=>{
+  const {ctx,get}=context();
+  vm.runInContext("outputRows=['success','warning','pending','unknown','duplicate','review_required'].map((status,i)=>({...fixture,COrderID:String(100001+i),__rowKey:'row-'+i,__fragrancexStatus:status})); selectedOrderKeys=new Set(outputRows.map(r=>r.__rowKey)); checkReady();",ctx);
+  const csv=vm.runInContext('csvText()',ctx);
+  assert.equal(csv.split('\n').length,7);
+  for(let i=0;i<6;i++) assert.ok(csv.includes(String(100001+i)));
+  assert.equal(get('placeSelectedBtn').disabled,true);
+  assert.equal(vm.runInContext('selectedOrderKeys.size',ctx),6);
+  assert.equal(vm.runInContext("outputRows[5].__fragrancexStatus",ctx),'review_required');
 });
 
 test('ledger read failure disables execution even when local results look new',async()=>{

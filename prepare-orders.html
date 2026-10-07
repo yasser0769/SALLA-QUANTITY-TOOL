@@ -1092,8 +1092,6 @@ function escapeCSVField(value){
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g,'""')}"` : text;
 }
 function csvText(){
-  const blocked = outputRows.find(row => BLOCKED_ORDER_STATUSES.has(row.__fragrancexStatus));
-  if (blocked) throw new Error(`طلب ${blocked.COrderID}: منفذ أو يحتاج مراجعة؛ استبعده من التصدير لمنع تكراره.`);
   const lines = [CSV_HEADERS.join(',')];
   for (const row of outputRows) {
     const address = shippingAddressLines(row.Address, row.Address2, row.COrderID);
@@ -1113,6 +1111,7 @@ function downloadCSV(){
   link.download = `prepared_orders_${new Date().toISOString().slice(0,10)}.csv`;
   link.click();
   URL.revokeObjectURL(url);
+  log(`تم تصدير ${outputRows.length} طلب إلى ملف CSV.`);
 }
 async function copyCSV(){
   if (outputRows.length === 0) return;
